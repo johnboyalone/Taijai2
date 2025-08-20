@@ -252,6 +252,7 @@ function listenToActions() {
 
 // ★★★ ฟังก์ชัน processGuess() ที่แก้ไขใหม่ทั้งหมด ★★★
 // ★★★ ฟังก์ชัน processGuess() ที่แก้ไขใหม่ทั้งหมด (Final Version) ★★★
+// ★★★ ฟังก์ชัน processGuess() ที่แก้ไขใหม่ทั้งหมด (The Confirmed Fix) ★★★
 function processGuess(action) {
     const gameRef = database.ref('games/' + currentGameId);
     
@@ -271,70 +272,38 @@ function processGuess(action) {
         newState.lastResult = { guess: action.guess, ...result };
     
         // --- 3. เปลี่ยนตาคนทาย ---
-        // สร้างสำเนาของคิวปัจจุบันเพื่อความปลอดภัย
+        // ดึงคิวปัจจุบันออกมา, ถ้าไม่มีให้สร้างเป็น array ว่าง
         let currentQueue = newState.guesserQueue || [];
     
-        // ถ้ายังมีคนในคิวรอทายอยู่
+        // ถ้ายังมีคนรอทายในคิว
         if (currentQueue.length > 0) {
-            // เอาคนถัดไปในคิวมาเป็นคนทาย
+            // เอาคนถัดไปมาเป็นคนทาย
             newState.currentGuesserId = currentQueue.shift();
-            newState.guesserQueue = currentQueue; // อัปเดตคิวที่สั้นลง
+            // ★★★ บรรทัดที่ถูกลืมและสำคัญที่สุด ★★★
+            // บันทึกคิวที่สั้นลงกลับเข้าไปใน State ที่จะอัปเดต
+            newState.guesserQueue = currentQueue; 
         } else {
-            // ถ้าคิวหมดแล้ว (ทุกคนทายครบแล้ว) -> เริ่มรอบใหม่
+            // ถ้าคิวหมดแล้ว -> เริ่มรอบใหม่
             const newTargetIndex = (newState.roundTargetIndex + 1) % activePlayerIds.length;
             const newTargetId = activePlayerIds[newTargetIndex];
                 
-            // ★★★ ส่วนที่แก้ไขและสำคัญที่สุด ★★★
             // สร้างคิวใหม่สำหรับรอบใหม่ (ทุกคนที่ไม่ใช่เป้าหมายใหม่)
             const newGuesserQueue = activePlayerIds.filter(pId => pId !== newTargetId);
                 
             newState.roundTargetIndex = newTargetIndex;
-            newState.guesserQueue = newGuesserQueue; // ใส่คิวใหม่เข้าไปใน State
+            newState.currentGuesserId = newGuesserQueue.shift(); // เอาคนแรกในคิวใหม่มาเป็นคนทาย
                 
-            // เอาคนแรกในคิวใหม่มาเป็นคนทาย
-            newState.currentGuesserId = newState.guesserQueue.shift();
+            // ★★★ บรรทัดที่ถูกลืมและสำคัญที่สุด ★★★
+            // บันทึกคิวใหม่ทั้งหมดกลับเข้าไปใน State ที่จะอัปเดต
+            newState.guesserQueue = newGuesserQueue; 
                 
             // ล้างผลลัพธ์เก่าเมื่อขึ้นรอบใหม่
             newState.lastResult = null; 
         }
     
-        // ส่งคืน State ที่อัปเดตแล้ว
+        // ส่งคืน State ที่อัปเดตแล้วทั้งหมดกลับขึ้นไปบน Firebase
         return newState;
     });
-}
-
-
-
-function updateUI(state) {
-    if (!state) return;
-    if (state.gameState === 'waiting') {
-        showScreen(dom.screens.waitingRoom);
-        updateWaitingRoomUI(state);
-    } else if (state.gameState === 'playing') {
-        showScreen(dom.screens.game);
-        updateGameScreenUI(state);
-    } else {
-        showScreen(dom.screens.lobby);
-    }
-}
-
-function updateWaitingRoomUI(state) {
-    dom.waitingRoom.roomCodeText.textContent = currentGameId;
-    dom.waitingRoom.playerList.innerHTML = '';
-    Object.values(state.players || {}).forEach(player => {
-        const li = document.createElement('li');
-        li.textContent = player.name;
-        dom.waitingRoom.playerList.appendChild(li);
-    });
-    if (isHost) {
-        dom.waitingRoom.statusText.textContent = 'คุณคือเจ้าของห้อง กด "เริ่มเกม" เมื่อทุกคนพร้อม';
-        dom.waitingRoom.startGameBtn.classList.remove('hidden');
-        const canStart = Object.keys(state.players || {}).length >= 2;
-        dom.waitingRoom.startGameBtn.disabled = !canStart;
-    } else {
-        dom.waitingRoom.statusText.textContent = 'รอเจ้าของห้องเริ่มเกม...';
-        dom.waitingRoom.startGameBtn.classList.add('hidden');
-    }
 }
 
 // --- EVENT LISTENERS ---
