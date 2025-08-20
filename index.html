@@ -3,36 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <!-- ★★★ 1. เปลี่ยนชื่อเกม ★★★ -->
     <title>ทายเลขทายใจ ภาค 2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500&family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+
+    <!-- ★★★ FIREBASE SDK (เพิ่มส่วนนี้) ★★★ -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
     <div id="game-container">
-        <!-- Welcome Screen -->
-        <div id="welcome-screen" class="screen">
-            <!-- ★★★ 1. เปลี่ยนชื่อเกม ★★★ -->
+
+        <!-- ★★★ LOBBY SCREEN (หน้าจอใหม่) ★★★ -->
+        <div id="lobby-screen" class="screen">
+            <h1>ทายเลขทายใจ ภาค 2</h1>
+            <div class="lobby-group">
+                <label for="player-name-input">ชื่อของคุณ:</label>
+                <input type="text" id="player-name-input" class="input-field" placeholder="ใส่ชื่อผู้เล่น..." maxlength="15">
+            </div>
+            <div class="lobby-group">
+                <button id="create-room-btn" class="btn-primary">สร้างห้องใหม่</button>
+            </div>
+            <div class="lobby-group or-divider"><span>หรือ</span></div>
+            <div class="lobby-group">
+                <input type="text" id="join-room-input" class="input-field" placeholder="ใส่รหัสห้อง..." maxlength="4">
+                <button id="join-room-btn" class="btn-secondary">เข้าร่วมห้อง</button>
+            </div>
+            <div id="lobby-error-msg" class="error-message"></div>
+        </div>
+
+        <!-- ★★★ WAITING ROOM SCREEN (หน้าจอใหม่) ★★★ -->
+        <div id="waiting-room-screen" class="screen hidden">
+            <h2>ห้องรอเล่น</h2>
+            <div class="room-code-display">
+                รหัสห้อง: <span id="room-code-text">----</span>
+                <button id="copy-room-code-btn" class="copy-btn">คัดลอก</button>
+            </div>
+            <h3>ผู้เล่นในห้อง:</h3>
+            <ul id="player-list-waiting">
+                <!-- รายชื่อผู้เล่นจะถูกเพิ่มที่นี่โดย script.js -->
+            </ul>
+            <p id="waiting-status-text">รอเจ้าของห้อง (Host) เริ่มเกม...</p>
+            <button id="start-game-from-waiting-btn" class="btn-primary hidden">เริ่มเกม!</button>
+        </div>
+
+
+        <!-- Welcome Screen (ซ่อนไว้ก่อน) -->
+        <div id="welcome-screen" class="screen hidden">
             <h1>ทายเลขทายใจ ภาค 2</h1>
             <div class="rules">
                 <h3>กติกาการเล่น</h3>
-                <!-- ★★★ 2. อัปเดตกติกาให้ครบถ้วน ★★★ -->
                 <p>
-                    <strong>เป้าหมาย:</strong> ในแต่ละรอบ จะมีผู้เล่นหนึ่งคนถูกเลือกเป็น "เป้าหมาย" ผู้เล่นที่เหลือทั้งหมดจะต้องทาย "เลขลับ" ของเป้าหมายให้ถูกต้อง<br><br>
-                    <strong>การทาย:</strong> ผู้เล่นแต่ละคนจะมีเวลาจำกัดในการทายเลข หากทายเลขครบหลักก่อนหมดเวลา ระบบจะบอกผลเป็น "ถูกตำแหน่ง (Strike)" และ "ถูกเลข (Ball)"<br><br>
-                    <strong>การชนะ:</strong> ผู้เล่นที่ยืนหยัดอยู่เป็นคนสุดท้าย จะเป็นผู้ชนะ!<br><br>
-                    <strong>เงื่อนไขการแพ้ (หมดพลังชีวิต):</strong><br>
-                    - ทายเลขลับของเป้าหมายผิด<br>
-                    - ไม่ทายเลขภายในเวลาที่กำหนด<br>
-                    - ถูกผู้เล่นอื่นทายเลขลับของตนเองได้สำเร็จ
+                    <strong>เป้าหมาย:</strong> ยืนหยัดเป็นผู้เล่นคนสุดท้ายที่รอดชีวิต!
+                </p>
+                <p>
+                    <strong>การเล่น:</strong> ในแต่ละรอบ จะมีผู้เล่น 1 คนถูกเลือกเป็น "เป้าหมาย" ผู้เล่นที่เหลือทั้งหมดจะต้องทาย "เลขลับ" ของเป้าหมาย
+                </p>
+                <p>
+                    <strong>การทาย:</strong> เมื่อทายเลข จะได้รับผลเป็น "ถูกตำแหน่ง (Strike)" และ "ถูกเลข (Ball)" เพื่อใช้เป็นคำใบ้ในการทายครั้งต่อไป
+                </p>
+                <p>
+                    <strong>การแพ้:</strong>
+                    <br>- ทายเลขลับของเป้าหมายผิดด้วยปุ่ม <strong>"ตุยซะเถอะ"</strong> จะเสียพลังชีวิต 1 ดวง
+                    <br>- หากปล่อยให้ **เวลาหมด** โดยไม่กดทาย จะเสียพลังชีวิต 1 ดวง
+                    <br>- เมื่อพลังชีวิตหมด (0 ดวง) จะถูกคัดออกจากเกม
+                </p>
+                <p>
+                    <strong>การชนะ:</strong> หากทายเลขลับของเป้าหมายถูกด้วยปุ่ม <strong>"ตุยซะเถอะ"</strong> เป้าหมายจะถูกคัดออกจากเกมทันที!
                 </p>
             </div>
             <button id="show-setup-btn" class="btn-primary">เริ่มเกม</button>
         </div>
 
-        <!-- ... โค้ดส่วน setup screen ไม่มีการเปลี่ยนแปลง ... -->
+        <!-- Setup Screen (ยังคงอยู่ แต่จะถูกเรียกใช้โดย Host) -->
         <div id="setup-screen" class="screen hidden">
             <h2>ตั้งค่าเกม</h2>
             <div class="setup-group">
@@ -46,30 +91,26 @@
             <button id="start-game-btn" class="btn-primary">เริ่มเล่น</button>
         </div>
 
-
-        <!-- Game Screen -->
+        <!-- Game Screen (ไม่เปลี่ยนแปลง) -->
         <div id="game-screen" class="screen hidden">
-            <!-- ... โค้ดส่วน game screen ... -->
             <div id="status-header">
                 <div id="main-status-text">ตาของฉัน</div>
                 <div id="sub-status-text">เป้าหมาย: ผู้เล่น 2</div>
             </div>
 
             <div id="players-bar">
-                <!-- ★★★ Element ใหม่สำหรับเส้นพลังงาน ★★★ -->
                 <svg id="energy-beam-svg" class="hidden">
                     <defs>
-                        <linearGradient id="energyGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stop-color="var(--accent-color-1)" stop-opacity="0" />
-                            <stop offset="50%" stop-color="var(--accent-color-1)" stop-opacity="1" />
-                            <stop offset="100%" stop-color="var(--accent-color-1)" stop-opacity="0" />
+                        <linearGradient id="beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:var(--accent-color-1);stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:var(--accent-color-2);stop-opacity:1" />
                         </linearGradient>
                     </defs>
-                    <path id="energy-beam-path" d="" stroke="url(#energyGradient)" stroke-width="4" fill="none" />
+                    <path id="energy-beam-path" d="" stroke="url(#beam-gradient)" stroke-width="4" stroke-linecap="round" fill="none"/>
                 </svg>
                 <div id="shout-guess-display" class="hidden"></div>
             </div>
-            <!-- ... โค้ดส่วนที่เหลือ ... -->
+
             <div id="my-secret-number-area">
                 <div class="secret-label">เลขลับของคุณ (แตะเพื่อซ่อน/แสดง)</div>
                 <div id="my-secret-number-display">----</div>
@@ -98,12 +139,11 @@
                     <button class="key num">0</button>
                     <button class="key action" id="submit-guess-btn">ทาย</button>
                 </div>
-                <!-- ★★★ 3. เปลี่ยนชื่อปุ่ม ★★★ -->
                 <button class="key eliminate" id="eliminate-btn">ตุยซะเถอะ!</button>
             </div>
         </div>
 
-        <!-- ... โค้ดส่วน game over screen ไม่มีการเปลี่ยนแปลง ... -->
+        <!-- Game Over Screen (ไม่เปลี่ยนแปลง) -->
         <div id="game-over-screen" class="screen hidden">
             <!-- Part 1: Winner Announcement -->
             <div id="winner-announcement" class="game-over-part">
@@ -143,8 +183,8 @@
         </div>
     </div>
 
+    <!-- Floating UI Elements (ไม่เปลี่ยนแปลง) -->
     <div id="elimination-skull-animation" class="hidden">💀</div>
-
     <button id="popup-history-btn" class="hidden">
         <span class="icon">📖</span>
         <div class="preview-text"></div>
