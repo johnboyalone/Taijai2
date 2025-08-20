@@ -1,4 +1,4 @@
-// ★★★★★ SCRIPT.JS - FINAL RESET VERSION (v8) ★★★★★
+// ★★★★★ SCRIPT.JS - FINAL FIXED VERSION (v8-Fixed) ★★★★★
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -11,7 +11,7 @@ const firebaseConfig = {
     appId: "1:111291976868:web:fee4606918ba2bbf93ea31"
 };
 
-// --- Initialize Firebase (v8 Syntax) ---
+// --- Initialize Firebase ---
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const auth = firebase.auth();
@@ -107,6 +107,8 @@ function updateWaitingRoomUI(gameData) {
 function updateGameUI(gameData) {
     const { players, roundTargetIndex, currentGuesserId, digitCount } = gameData;
     const activePlayerIds = Object.keys(players).filter(pId => !players[pId].isEliminated);
+    if (activePlayerIds.length === 0) return;
+
     const targetId = activePlayerIds[roundTargetIndex];
     const target = players[targetId];
     const guesser = players[currentGuesserId];
@@ -128,7 +130,10 @@ function updateGameUI(gameData) {
             if (p.id === guesser.id) playerBox.classList.add('guesser');
             if (p.id === target.id) playerBox.classList.add('target');
         }
-        playerBox.innerHTML = `<div class="player-name">${p.name}</div><div class="player-role">${p.isEliminated ? 'แพ้แล้ว 💀' : (p.id === target.id ? 'เป้าหมาย' : `พลังชีวิต: ${p.eliminationTries} ❤️`)}</div>`;
+        playerBox.innerHTML = `
+            <div class="player-name">${p.name}</div>
+            <div class="player-role">${p.isEliminated ? 'แพ้แล้ว 💀' : (p.id === target.id ? 'เป้าหมาย' : `พลังชีวิต: ${p.eliminationTries} ❤️`)}</div>
+        `;
         dom.game.playersBar.appendChild(playerBox);
     });
 
@@ -141,7 +146,6 @@ function updateGameUI(gameData) {
     const isMyTurn = currentGuesserId === myPlayerId;
     dom.game.keypad.style.pointerEvents = isMyTurn ? 'auto' : 'none';
     dom.game.keypad.style.opacity = isMyTurn ? '1' : '0.5';
-    dom.buttons.eliminate.disabled = !isMyTurn;
     dom.buttons.submitGuess.disabled = !isMyTurn;
 }
 
@@ -172,11 +176,12 @@ function drawEnergyBeam(guesserElement, targetElement) {
 // --- Firebase Interaction ---
 function listenToGameUpdates(gameId) {
     const gameRef = database.ref('games/' + gameId);
-    gameRef.on('value', (snapshot) => {
+    const gameListener = gameRef.on('value', (snapshot) => {
         const gameData = snapshot.val();
         if (!gameData) {
             showScreen(dom.screens.lobby);
             alert("ห้องเกมถูกปิดแล้ว");
+            cleanupListeners(gameId);
             return;
         }
         gameState = gameData;
@@ -190,35 +195,69 @@ function listenToGameUpdates(gameId) {
                 const resultText = `${gameData.lastResult.strikes}S ${gameData.lastResult.balls}B`;
                 dom.game.guessDisplay.textContent = resultText;
             } else {
-                dom.game.guessDisplay.textContent = '-'.repeat(gameData.digitCount || 4);
+                const digitCount = gameData.digitCount || 4;
+                dom.game.guessDisplay.textContent = '-'.repeat(digitCount);
             }
         }
     });
+
+    // ตั้ง listener สำหรับ actions (เฉพาะ host)
+    const actionsRef = database.ref(`games/${gameId}/actions`);
+    const actionsListener = actionsRef.on('child_added', (snapshot) => {
+        const action = snapshot.val();
+        if (action.type === 'GUESS' && myPlayerId === gameState.hostId) {
+            processGuess(action);
+            snapshot.ref.remove(); // ลบ action หลังประมวลผล
+        }
+    });
+
+    // เก็บ listener เพื่อลบภายหลัง
+    window.cleanupListeners = function (id) {
+        if (id === gameId) {
+            gameRef.off('value', gameListener);
+            actionsRef.off('child_added', actionsListener);
+        }
+    };
 }
 
 function processGuess(action) {
     const gameRef = database.ref('games/' + currentGameId);
     gameRef.transaction((currentState) => {
-        if (currentState === null) return currentState;
+        if (currentState === null || !currentState.players[action.playerId]) return currentState;
+
         const activePlayerIds = Object.keys(currentState.players).filter(pId => !currentState.players[pId].isEliminated);
         const targetId = activePlayerIds[currentState.roundTargetIndex];
         const targetPlayer = currentState.players[targetId];
+        if (!targetPlayer) return currentState;
+
         const result = checkGuess(action.guess, targetPlayer.secretNumber);
         let newState = { ...currentState };
         newState.lastResult = { guess: action.guess, ...result };
-        let currentQueue = newState.guesserQueue || [];
-        if (currentQueue.length > 0) {
-            newState.currentGuesserId = currentQueue.shift();
-            newState.guesserQueue = currentQueue;
+
+        // ลดพลังชีวิตถ้าทายผิด
+        const guesser = newState.players[action.playerId];
+        if (result.strikes !== newState.digitCount) {
+            guesser.eliminationTries -= 1;
+            if (guesser.eliminationTries <= 0) {
+                guesser.isEliminated = true;
+            }
+        }
+
+        // จัดการ turn ถัดไป
+        let queue = newState.guesserQueue || [];
+        if (queue.length > 0) {
+            newState.currentGuesserId = queue.shift();
+            newState.guesserQueue = queue;
         } else {
             const newTargetIndex = (newState.roundTargetIndex + 1) % activePlayerIds.length;
             const newTargetId = activePlayerIds[newTargetIndex];
-            const newGuesserQueue = activePlayerIds.filter(pId => pId !== newTargetId);
+            const newQueue = activePlayerIds.filter(pId => pId !== newTargetId);
             newState.roundTargetIndex = newTargetIndex;
-            newState.currentGuesserId = newGuesserQueue.shift();
-            newState.guesserQueue = newGuesserQueue;
+            newState.currentGuesserId = newQueue.shift();
+            newState.guesserQueue = newQueue;
             newState.lastResult = null;
         }
+
         return newState;
     });
 }
@@ -240,15 +279,24 @@ function initializeApp() {
         }
         const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
         const gameRef = database.ref('games/' + roomId);
+        const playerRef = gameRef.child('players').child(myPlayerId);
         const initialGameState = {
             hostId: myPlayerId,
             gameState: 'waiting',
-            players: { [myPlayerId]: { id: myPlayerId, name: playerName, isEliminated: false, eliminationTries: 3, } },
+            players: {},
             digitCount: 4,
         };
         gameRef.set(initialGameState).then(() => {
-            currentGameId = roomId;
-            listenToGameUpdates(roomId);
+            playerRef.set({
+                id: myPlayerId,
+                name: playerName,
+                isEliminated: false,
+                eliminationTries: 3,
+            }).then(() => {
+                playerRef.onDisconnect().remove(); // ลบเมื่อ disconnect
+                currentGameId = roomId;
+                listenToGameUpdates(roomId);
+            });
         });
     });
 
@@ -263,7 +311,13 @@ function initializeApp() {
         const gameRef = database.ref('games/' + roomId);
         gameRef.once('value', (snapshot) => {
             if (snapshot.exists()) {
-                playerRef.set({ id: myPlayerId, name: playerName, isEliminated: false, eliminationTries: 3, }).then(() => {
+                playerRef.set({
+                    id: myPlayerId,
+                    name: playerName,
+                    isEliminated: false,
+                    eliminationTries: 3,
+                }).then(() => {
+                    playerRef.onDisconnect().remove();
                     currentGameId = roomId;
                     listenToGameUpdates(roomId);
                 });
@@ -277,14 +331,18 @@ function initializeApp() {
         if (gameState.hostId !== myPlayerId) return;
         const gameRef = database.ref('games/' + currentGameId);
         const playerIds = Object.keys(gameState.players);
-        const updatedPlayers = { ...gameState.players };
+        const updatedPlayers = {};
         playerIds.forEach(pId => {
-            updatedPlayers[pId].secretNumber = generateSecretNumber(gameState.digitCount);
+            updatedPlayers[pId] = {
+                ...gameState.players[pId],
+                secretNumber: generateSecretNumber(gameState.digitCount),
+            };
         });
         const targetIndex = 0;
         const targetId = playerIds[targetIndex];
         const guesserQueue = playerIds.filter(pId => pId !== targetId);
         const firstGuesserId = guesserQueue.shift();
+
         gameRef.update({
             gameState: 'playing',
             players: updatedPlayers,
@@ -296,14 +354,20 @@ function initializeApp() {
     });
 
     dom.buttons.copyRoomCode.addEventListener('click', () => {
-        navigator.clipboard.writeText(currentGameId).then(() => { alert('คัดลอกรหัสห้องแล้ว!'); });
+        navigator.clipboard.writeText(currentGameId).then(() => {
+            alert('คัดลอกรหัสห้องแล้ว!');
+        }).catch(err => {
+            console.warn('Copy failed:', err);
+        });
     });
 
     dom.game.keypad.addEventListener('click', (e) => {
         if (!e.target.classList.contains('key')) return;
         const digitCount = gameState.digitCount || 4;
         if (e.target.classList.contains('num')) {
-            if (currentGuess.length < digitCount) currentGuess += e.target.textContent;
+            if (currentGuess.length < digitCount) {
+                currentGuess += e.target.textContent;
+            }
         } else if (e.target.id === 'clear-btn') {
             currentGuess = currentGuess.slice(0, -1);
         }
@@ -312,16 +376,21 @@ function initializeApp() {
 
     dom.buttons.submitGuess.addEventListener('click', () => {
         const digitCount = gameState.digitCount || 4;
-        if (currentGuess.length !== digitCount) return;
-        if (gameState.hostId === myPlayerId) {
+        if (currentGuess.length !== digitCount || !gameState.players[myPlayerId]) return;
+        if (dom.buttons.submitGuess.disabled) return; // ป้องกัน double click
+
+        if (myPlayerId === gameState.hostId) {
             processGuess({ type: 'GUESS', guess: currentGuess, playerId: myPlayerId });
         } else {
             const actionsRef = database.ref(`games/${currentGameId}/actions`);
             actionsRef.push({ type: 'GUESS', guess: currentGuess, playerId: myPlayerId });
         }
         currentGuess = "";
+        dom.game.guessDisplay.textContent = '-'.repeat(digitCount);
+        dom.buttons.submitGuess.disabled = true;
     });
 
+    // เริ่มต้น
     showScreen(dom.screens.lobby);
 }
 
