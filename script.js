@@ -13,7 +13,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// --- GAME STATE ---
+// --- GAME CONFIG & STATE ---
+const INITIAL_ELIMINATION_TRIES = 3;
 let myPlayerId = null;
 let myPlayerName = '';
 let currentGameId = null;
@@ -25,6 +26,16 @@ const dom = {
     lobby: { playerNameInput: document.getElementById('player-name-input'), createRoomBtn: document.getElementById('create-room-btn'), joinRoomInput: document.getElementById('join-room-input'), joinRoomBtn: document.getElementById('join-room-btn'), errorMsg: document.getElementById('lobby-error-msg'), },
     waitingRoom: { roomCodeText: document.getElementById('room-code-text'), copyRoomCodeBtn: document.getElementById('copy-room-code-btn'), playerList: document.getElementById('player-list-waiting'), statusText: document.getElementById('waiting-status-text'), startGameBtn: document.getElementById('start-game-from-waiting-btn'), },
 };
+
+// --- HELPER FUNCTIONS ---
+function generateSecretNumber(digitCount) {
+    let digits = [];
+    while (digits.length < digitCount) {
+        const digit = Math.floor(Math.random() * 10);
+        if (digits.indexOf(digit) === -1) { digits.push(digit); }
+    }
+    return digits.join('');
+}
 
 // --- UI FUNCTIONS ---
 function showScreen(screenElement) {
@@ -43,7 +54,7 @@ function createRoom() {
     isHost = true;
     const gameRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     currentGameId = gameRoomId;
-        
+    
     const newPlayerRef = database.ref('games/' + gameRoomId + '/players').push();
     myPlayerId = newPlayerRef.key;
 
@@ -106,6 +117,42 @@ function listenToGameChanges() {
     });
 }
 
+// ★★★ ฟังก์ชันใหม่ที่เพิ่มเข้ามา ★★★
+function startGame() {
+    if (!isHost || !currentGameId) return;
+
+    const gameRef = database.ref('games/' + currentGameId);
+    gameRef.once('value').then((snapshot) => {
+        const currentState = snapshot.val();
+        const playerIds = Object.keys(currentState.players);
+
+        // สร้างข้อมูลเริ่มต้นสำหรับผู้เล่นแต่ละคน
+        const playersData = {};
+        playerIds.forEach(playerId => {
+            playersData[playerId] = {
+                ...currentState.players[playerId], // คงชื่อผู้เล่นไว้
+                secretNumber: generateSecretNumber(4), // สมมติว่าเล่น 4 หลัก
+                eliminationTries: INITIAL_ELIMINATION_TRIES,
+                isEliminated: false,
+            };
+        });
+
+        // สร้างสถานะเริ่มต้นของเกม
+        const initialPlayState = {
+            gameState: 'playing',
+            players: playersData,
+            roundTargetIndex: 0,
+            guesserQueue: playerIds.slice(1), // ให้คนแรกเป็นเป้าหมาย คนที่เหลือเป็นผู้ทาย
+            currentGuesserId: playerIds[1], // คนที่สองเริ่มทายก่อน
+            currentGuess: "",
+            actions: {}, // สำหรับเก็บการทายของผู้เล่น
+        };
+
+        // อัปเดตสถานะเกมใน Firebase
+        gameRef.update(initialPlayState);
+    });
+}
+
 function updateUI(state) {
     if (!state) return;
     if (state.gameState === 'waiting') {
@@ -113,6 +160,9 @@ function updateUI(state) {
         updateWaitingRoomUI(state);
     } else if (state.gameState === 'playing') {
         showScreen(dom.screens.game);
+        // เราจะวาดหน้าจอเกมจริงๆ ในขั้นตอนต่อไป
+        // ตอนนี้แค่แสดงหน้าจอว่างๆ ก่อน
+        document.getElementById('game-screen').innerHTML = `<h1>เกมเริ่มแล้ว! (กำลังสร้างหน้าจอเล่นเกม)</h1>`;
     } else {
         showScreen(dom.screens.lobby);
     }
@@ -129,7 +179,8 @@ function updateWaitingRoomUI(state) {
     if (isHost) {
         dom.waitingRoom.statusText.textContent = 'คุณคือเจ้าของห้อง กด "เริ่มเกม" เมื่อทุกคนพร้อม';
         dom.waitingRoom.startGameBtn.classList.remove('hidden');
-        dom.waitingRoom.startGameBtn.disabled = Object.keys(state.players).length < 2;
+        const canStart = Object.keys(state.players || {}).length >= 2;
+        dom.waitingRoom.startGameBtn.disabled = !canStart;
     } else {
         dom.waitingRoom.statusText.textContent = 'รอเจ้าของห้องเริ่มเกม...';
         dom.waitingRoom.startGameBtn.classList.add('hidden');
@@ -145,6 +196,10 @@ function initializeApp() {
             navigator.clipboard.writeText(currentGameId).then(() => alert('คัดลอกรหัสห้องแล้ว!'));
         }
     });
+    
+    // ★★★ ผูก Event Listener ให้กับปุ่มเริ่มเกม ★★★
+    dom.waitingRoom.startGameBtn.addEventListener('click', startGame);
+
     showScreen(dom.screens.lobby);
 }
 
