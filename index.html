@@ -9,75 +9,73 @@
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500&family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 
-    <!-- ★★★ FIREBASE SDK (เพิ่มส่วนนี้) ★★★ -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- ★★★ FIREBASE SDK (v9 Modular) ★★★ -->
+    <!-- เราจะ import โดยตรงจากใน script.js ที่เป็น module -->
+
 </head>
 <body>
     <div id="game-container">
 
-        <!-- ★★★ LOBBY SCREEN (หน้าจอใหม่) ★★★ -->
+        <!-- ★★★ LOBBY SCREEN (หน้าใหม่) ★★★ -->
         <div id="lobby-screen" class="screen">
-            <h1>ทายเลขทายใจ ภาค 2</h1>
+            <h2>ทายเลขทายใจ ภาค 2</h2>
             <div class="lobby-group">
-                <label for="player-name-input">ชื่อของคุณ:</label>
-                <input type="text" id="player-name-input" class="input-field" placeholder="ใส่ชื่อผู้เล่น..." maxlength="15">
+                <label for="player-name-input">ชื่อผู้เล่น:</label>
+                <input type="text" id="player-name-input" placeholder="ใส่ชื่อของคุณที่นี่..." maxlength="15">
             </div>
             <div class="lobby-group">
-                <button id="create-room-btn" class="btn-primary">สร้างห้องใหม่</button>
+                <button id="create-room-btn" class="btn-primary">สร้างห้อง</button>
             </div>
-            <div class="lobby-group or-divider"><span>หรือ</span></div>
+            <div class="lobby-or-divider"><span>หรือ</span></div>
             <div class="lobby-group">
-                <input type="text" id="join-room-input" class="input-field" placeholder="ใส่รหัสห้อง..." maxlength="4">
+                <input type="text" id="join-room-input" placeholder="ใส่รหัสห้อง..." maxlength="4">
                 <button id="join-room-btn" class="btn-secondary">เข้าร่วมห้อง</button>
             </div>
-            <div id="lobby-error-msg" class="error-message"></div>
+            <div id="lobby-error-msg"></div>
         </div>
 
-        <!-- ★★★ WAITING ROOM SCREEN (หน้าจอใหม่) ★★★ -->
+        <!-- ★★★ WAITING ROOM SCREEN (หน้าใหม่) ★★★ -->
         <div id="waiting-room-screen" class="screen hidden">
             <h2>ห้องรอเล่น</h2>
-            <div class="room-code-display">
+            <div class="room-code-area">
                 รหัสห้อง: <span id="room-code-text">----</span>
-                <button id="copy-room-code-btn" class="copy-btn">คัดลอก</button>
+                <button id="copy-room-code-btn">คัดลอก</button>
             </div>
             <h3>ผู้เล่นในห้อง:</h3>
             <ul id="player-list-waiting">
                 <!-- รายชื่อผู้เล่นจะถูกเพิ่มที่นี่โดย script.js -->
             </ul>
-            <p id="waiting-status-text">รอเจ้าของห้อง (Host) เริ่มเกม...</p>
-            <button id="start-game-from-waiting-btn" class="btn-primary hidden">เริ่มเกม!</button>
+            <p id="waiting-status-text">รอผู้เล่นอื่นเข้าร่วม...</p>
+            <button id="start-game-from-waiting-btn" class="btn-primary hidden">เริ่มเกม</button>
         </div>
 
 
-        <!-- Welcome Screen (ซ่อนไว้ก่อน) -->
+        <!-- Welcome Screen (ซ่อนไว้ก่อน อาจจะนำกลับมาใช้ทีหลัง) -->
         <div id="welcome-screen" class="screen hidden">
             <h1>ทายเลขทายใจ ภาค 2</h1>
             <div class="rules">
-                <h3>กติกาการเล่น</h3>
-                <p>
-                    <strong>เป้าหมาย:</strong> ยืนหยัดเป็นผู้เล่นคนสุดท้ายที่รอดชีวิต!
+                <h3>กติกา</h3>
+                <p><strong>เป้าหมาย:</strong> ยืนหยัดเป็นผู้รอดชีวิตคนสุดท้าย!</p>
+                <p><strong>การเล่น:</strong> ในแต่ละรอบ จะมีผู้เล่น 1 คนถูกเลือกเป็น "เป้าหมาย" ผู้เล่นที่เหลือทั้งหมดจะต้องทาย "เลขลับ" ของเป้าหมาย</p>
+                <p><strong>การทาย:</strong>
+                    <br>- <strong>ทายถูกตำแหน่ง (Strike):</strong> คุณทายตัวเลขและตำแหน่งถูกต้อง
+                    <br>- <strong>ทายถูกเลข (Ball):</strong> คุณทายตัวเลขถูก แต่ตำแหน่งผิด
                 </p>
-                <p>
-                    <strong>การเล่น:</strong> ในแต่ละรอบ จะมีผู้เล่น 1 คนถูกเลือกเป็น "เป้าหมาย" ผู้เล่นที่เหลือทั้งหมดจะต้องทาย "เลขลับ" ของเป้าหมาย
+                <p><strong>การกำจัด:</strong>
+                    <br>- หากคุณมั่นใจในเลขลับของเป้าหมาย กดปุ่ม <strong>"ตุยซะเถอะ!"</strong>
+                    <br>- <strong>ทายถูก:</strong> เป้าหมายจะถูกกำจัดออกจากเกมทันที!
+                    <br>- <strong>ทายผิด:</strong> คุณจะเสียพลังชีวิต 1 ดวง และถ้าพลังชีวิตหมด คุณจะแพ้!
                 </p>
-                <p>
-                    <strong>การทาย:</strong> เมื่อทายเลข จะได้รับผลเป็น "ถูกตำแหน่ง (Strike)" และ "ถูกเลข (Ball)" เพื่อใช้เป็นคำใบ้ในการทายครั้งต่อไป
-                </p>
-                <p>
-                    <strong>การแพ้:</strong>
-                    <br>- ทายเลขลับของเป้าหมายผิดด้วยปุ่ม <strong>"ตุยซะเถอะ"</strong> จะเสียพลังชีวิต 1 ดวง
-                    <br>- หากปล่อยให้ **เวลาหมด** โดยไม่กดทาย จะเสียพลังชีวิต 1 ดวง
-                    <br>- เมื่อพลังชีวิตหมด (0 ดวง) จะถูกคัดออกจากเกม
-                </p>
-                <p>
-                    <strong>การชนะ:</strong> หากทายเลขลับของเป้าหมายถูกด้วยปุ่ม <strong>"ตุยซะเถอะ"</strong> เป้าหมายจะถูกคัดออกจากเกมทันที!
+                 <p><strong>เงื่อนไขการแพ้:</strong>
+                    <br>- ถูกผู้เล่นอื่นกำจัดสำเร็จ
+                    <br>- พลังชีวิตหมดจากการทายผิด
+                    <br>- ไม่ทายเลขในเวลาที่กำหนด (จะเสียพลังชีวิต 1 ดวง)
                 </p>
             </div>
-            <button id="show-setup-btn" class="btn-primary">เริ่มเกม</button>
+            <button id="show-setup-btn" class="btn-primary">เริ่มเกม (โหมดเล่นคนเดียว)</button>
         </div>
 
-        <!-- Setup Screen (ยังคงอยู่ แต่จะถูกเรียกใช้โดย Host) -->
+        <!-- Setup Screen (ซ่อนไว้ก่อน) -->
         <div id="setup-screen" class="screen hidden">
             <h2>ตั้งค่าเกม</h2>
             <div class="setup-group">
@@ -91,7 +89,7 @@
             <button id="start-game-btn" class="btn-primary">เริ่มเล่น</button>
         </div>
 
-        <!-- Game Screen (ไม่เปลี่ยนแปลง) -->
+        <!-- Game Screen -->
         <div id="game-screen" class="screen hidden">
             <div id="status-header">
                 <div id="main-status-text">ตาของฉัน</div>
@@ -99,14 +97,9 @@
             </div>
 
             <div id="players-bar">
+                <!-- Player status boxes will be added here by script.js -->
                 <svg id="energy-beam-svg" class="hidden">
-                    <defs>
-                        <linearGradient id="beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" style="stop-color:var(--accent-color-1);stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:var(--accent-color-2);stop-opacity:1" />
-                        </linearGradient>
-                    </defs>
-                    <path id="energy-beam-path" d="" stroke="url(#beam-gradient)" stroke-width="4" stroke-linecap="round" fill="none"/>
+                    <path id="energy-beam-path" d="M 0,0 L 0,0" />
                 </svg>
                 <div id="shout-guess-display" class="hidden"></div>
             </div>
@@ -141,9 +134,10 @@
                 </div>
                 <button class="key eliminate" id="eliminate-btn">ตุยซะเถอะ!</button>
             </div>
+            <div id="skull-animation-container" class="hidden">💀</div>
         </div>
 
-        <!-- Game Over Screen (ไม่เปลี่ยนแปลง) -->
+        <!-- Game Over Screen -->
         <div id="game-over-screen" class="screen hidden">
             <!-- Part 1: Winner Announcement -->
             <div id="winner-announcement" class="game-over-part">
@@ -183,8 +177,7 @@
         </div>
     </div>
 
-    <!-- Floating UI Elements (ไม่เปลี่ยนแปลง) -->
-    <div id="elimination-skull-animation" class="hidden">💀</div>
+    <!-- Floating UI Elements -->
     <button id="popup-history-btn" class="hidden">
         <span class="icon">📖</span>
         <div class="preview-text"></div>
@@ -198,6 +191,7 @@
         </div>
     </div>
 
+    <!-- ★★★ SCRIPT TAG ที่แก้ไขแล้ว ★★★ -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
