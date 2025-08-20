@@ -251,12 +251,11 @@ function listenToActions() {
 
 
 // ★★★ ฟังก์ชัน processGuess() ที่แก้ไขใหม่ทั้งหมด ★★★
+// ★★★ ฟังก์ชัน processGuess() ที่แก้ไขใหม่ทั้งหมด (Final Version) ★★★
 function processGuess(action) {
     const gameRef = database.ref('games/' + currentGameId);
     
-    // ใช้ transaction เพื่อป้องกันปัญหาข้อมูลไม่ตรงกัน
     gameRef.transaction((currentState) => {
-        // ถ้าไม่มี state ปัจจุบัน ให้ยกเลิก
         if (currentState === null) {
             return currentState;
         }
@@ -269,28 +268,33 @@ function processGuess(action) {
     
         // --- 2. เตรียม State ใหม่ ---
         let newState = { ...currentState };
-        newState.lastResult = { guess: action.guess, ...result }; // เก็บผลลัพธ์ล่าสุดเพื่อแสดงผล
+        newState.lastResult = { guess: action.guess, ...result };
     
         // --- 3. เปลี่ยนตาคนทาย ---
+        // สร้างสำเนาของคิวปัจจุบันเพื่อความปลอดภัย
+        let currentQueue = newState.guesserQueue || [];
+    
         // ถ้ายังมีคนในคิวรอทายอยู่
-        if (newState.guesserQueue && newState.guesserQueue.length > 0) {
+        if (currentQueue.length > 0) {
             // เอาคนถัดไปในคิวมาเป็นคนทาย
-            newState.currentGuesserId = newState.guesserQueue.shift();
+            newState.currentGuesserId = currentQueue.shift();
+            newState.guesserQueue = currentQueue; // อัปเดตคิวที่สั้นลง
         } else {
             // ถ้าคิวหมดแล้ว (ทุกคนทายครบแล้ว) -> เริ่มรอบใหม่
             const newTargetIndex = (newState.roundTargetIndex + 1) % activePlayerIds.length;
             const newTargetId = activePlayerIds[newTargetIndex];
                 
+            // ★★★ ส่วนที่แก้ไขและสำคัญที่สุด ★★★
             // สร้างคิวใหม่สำหรับรอบใหม่ (ทุกคนที่ไม่ใช่เป้าหมายใหม่)
             const newGuesserQueue = activePlayerIds.filter(pId => pId !== newTargetId);
                 
             newState.roundTargetIndex = newTargetIndex;
-            newState.guesserQueue = newGuesserQueue;
+            newState.guesserQueue = newGuesserQueue; // ใส่คิวใหม่เข้าไปใน State
                 
             // เอาคนแรกในคิวใหม่มาเป็นคนทาย
             newState.currentGuesserId = newState.guesserQueue.shift();
                 
-            // ★★★ แก้ไขปัญหาสำคัญ: ล้างผลลัพธ์เก่าเมื่อขึ้นรอบใหม่ ★★★
+            // ล้างผลลัพธ์เก่าเมื่อขึ้นรอบใหม่
             newState.lastResult = null; 
         }
     
@@ -298,6 +302,7 @@ function processGuess(action) {
         return newState;
     });
 }
+
 
 
 function updateUI(state) {
