@@ -6,11 +6,12 @@ const firebaseConfig = {
   projectId: "taijai2",
   storageBucket: "taijai2.appspot.com",
   messagingSenderId: "111291976868",
-  appId: "1:111291976868:web:fee4606918ba2bbf93ea31"
+  appId: "1:11291976868:web:fee4606918ba2bbf93ea31"
 };
 
 // ★★★ INITIALIZE FIREBASE & DATABASE SERVICES ★★★
-// สังเกตว่าเราจะเรียกใช้ firebase.app และ firebase.database โดยตรง
+// สังเกตว่าเราจะเรียกใช้ firebase.initializeApp และ firebase.database โดยตรง
+// ซึ่งตัวแปร firebase มาจาก script tag ใน index.html
 const app = firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
@@ -27,16 +28,6 @@ const dom = {
     lobby: { playerNameInput: document.getElementById('player-name-input'), createRoomBtn: document.getElementById('create-room-btn'), joinRoomInput: document.getElementById('join-room-input'), joinRoomBtn: document.getElementById('join-room-btn'), errorMsg: document.getElementById('lobby-error-msg'), },
     waitingRoom: { roomCodeText: document.getElementById('room-code-text'), copyRoomCodeBtn: document.getElementById('copy-room-code-btn'), playerList: document.getElementById('player-list-waiting'), statusText: document.getElementById('waiting-status-text'), startGameBtn: document.getElementById('start-game-from-waiting-btn'), },
 };
-
-// --- HELPER FUNCTIONS ---
-function generateSecretNumber(digitCount) {
-    let digits = [];
-    while (digits.length < digitCount) {
-        const digit = Math.floor(Math.random() * 10);
-        if (digits.indexOf(digit) === -1) { digits.push(digit); }
-    }
-    return digits.join('');
-}
 
 // --- UI FUNCTIONS ---
 function showScreen(screenElement) {
@@ -55,7 +46,7 @@ async function createRoom() {
     isHost = true;
     const gameRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     currentGameId = gameRoomId;
-        
+    
     const newPlayerRef = database.ref('games/' + gameRoomId + '/players').push();
     myPlayerId = newPlayerRef.key;
 
@@ -124,6 +115,7 @@ function updateUI(state) {
         updateWaitingRoomUI(state);
     } else if (state.gameState === 'playing') {
         showScreen(dom.screens.game);
+        // เราจะวาดหน้าจอเกมในขั้นตอนต่อไป
     } else {
         showScreen(dom.screens.lobby);
     }
