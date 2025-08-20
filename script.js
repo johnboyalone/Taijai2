@@ -218,20 +218,37 @@ function startGame() {
     });
 }
 
-// ★★★ ฟังก์ชันใหม่สำหรับ Host เพื่อประมวลผล ★★★
+// ★★★ ฟังก์ชัน listenToActions() ที่แก้ไขแล้ว ★★★
 function listenToActions() {
+    // หยุดการทำงานทันทีถ้าไม่ใช่ Host หรือไม่มี ID ห้อง
     if (!isHost || !currentGameId) return;
+    
     const actionsRef = database.ref(`games/${currentGameId}/actions`);
+    
+    // ใช้ .on('child_added') เพื่อดักฟัง Action ใหม่ๆ ที่เข้ามา
+    // นี่คือวิธีที่ถูกต้องและเสถียรที่สุด
     actionsRef.on('child_added', (snapshot) => {
+        // ตรวจสอบให้แน่ใจว่า snapshot มีข้อมูลอยู่จริง
+        if (!snapshot.exists()) {
+            return;
+        }
+    
         const action = snapshot.val();
         const actionId = snapshot.key;
-        if (action.type === 'GUESS') {
+    
+        // ตรวจสอบว่า action มี type หรือไม่ เพื่อป้องกัน error
+        if (action && action.type === 'GUESS') {
+            // เรียกใช้ฟังก์ชันประมวลผลการทาย
             processGuess(action);
         }
-        // ลบ Action ที่ประมวลผลแล้วออกไป
-        actionsRef.child(actionId).remove();
+    
+        // ★★★ ส่วนสำคัญ ★★★
+        // หลังจากประมวลผลเสร็จแล้ว ให้ลบ action นั้นออกจากคิวทันที
+        // เพื่อป้องกันการประมวลผลซ้ำซ้อน
+        snapshot.ref.remove();
     });
 }
+
 
 // ★★★ ฟังก์ชันใหม่สำหรับ Host เพื่อคำนวณผลลัพธ์ ★★★
 function processGuess(action) {
