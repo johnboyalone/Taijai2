@@ -222,9 +222,9 @@ function startGame() {
 function listenToActions() {
     // หยุดการทำงานทันทีถ้าไม่ใช่ Host หรือไม่มี ID ห้อง
     if (!isHost || !currentGameId) return;
-    
+
     const actionsRef = database.ref(`games/${currentGameId}/actions`);
-    
+
     // ใช้ .on('child_added') เพื่อดักฟัง Action ใหม่ๆ ที่เข้ามา
     // นี่คือวิธีที่ถูกต้องและเสถียรที่สุด
     actionsRef.on('child_added', (snapshot) => {
@@ -232,16 +232,16 @@ function listenToActions() {
         if (!snapshot.exists()) {
             return;
         }
-    
+
         const action = snapshot.val();
         const actionId = snapshot.key;
-    
+
         // ตรวจสอบว่า action มี type หรือไม่ เพื่อป้องกัน error
         if (action && action.type === 'GUESS') {
             // เรียกใช้ฟังก์ชันประมวลผลการทาย
             processGuess(action);
         }
-    
+
         // ★★★ ส่วนสำคัญ ★★★
         // หลังจากประมวลผลเสร็จแล้ว ให้ลบ action นั้นออกจากคิวทันที
         // เพื่อป้องกันการประมวลผลซ้ำซ้อน
@@ -250,39 +250,55 @@ function listenToActions() {
 }
 
 
-// ★★★ ฟังก์ชันใหม่สำหรับ Host เพื่อคำนวณผลลัพธ์ ★★★
+// ★★★ ฟังก์ชัน processGuess() ที่แก้ไขใหม่ทั้งหมด ★★★
 function processGuess(action) {
     const gameRef = database.ref('games/' + currentGameId);
-    gameRef.once('value').then((snapshot) => {
-        let currentState = snapshot.val();
-        
+    
+    // ใช้ transaction เพื่อป้องกันปัญหาข้อมูลไม่ตรงกัน
+    gameRef.transaction((currentState) => {
+        // ถ้าไม่มี state ปัจจุบัน ให้ยกเลิก
+        if (currentState === null) {
+            return currentState;
+        }
+    
+        // --- 1. คำนวณผลลัพธ์ ---
         const activePlayerIds = Object.keys(currentState.players).filter(pId => !currentState.players[pId].isEliminated);
         const targetId = activePlayerIds[currentState.roundTargetIndex];
         const targetPlayer = currentState.players[targetId];
-        const guesserPlayer = currentState.players[action.guesserId];
-
-        // คำนวณผลลัพธ์
         const result = checkGuess(action.guess, targetPlayer.secretNumber);
-        
-        // สร้าง State ใหม่ที่จะอัปเดต
+    
+        // --- 2. เตรียม State ใหม่ ---
         let newState = { ...currentState };
         newState.lastResult = { guess: action.guess, ...result }; // เก็บผลลัพธ์ล่าสุดเพื่อแสดงผล
-
-        // เปลี่ยนตาคนทาย
-        if (newState.guesserQueue.length > 0) {
+    
+        // --- 3. เปลี่ยนตาคนทาย ---
+        // ถ้ายังมีคนในคิวรอทายอยู่
+        if (newState.guesserQueue && newState.guesserQueue.length > 0) {
+            // เอาคนถัดไปในคิวมาเป็นคนทาย
             newState.currentGuesserId = newState.guesserQueue.shift();
         } else {
-            // ถ้าทายครบทุกคนแล้ว ให้ขึ้นรอบใหม่
-            newState.roundTargetIndex = (newState.roundTargetIndex + 1) % activePlayerIds.length;
-            const newTargetId = activePlayerIds[newState.roundTargetIndex];
-            newState.guesserQueue = activePlayerIds.filter(pId => pId !== newTargetId);
+            // ถ้าคิวหมดแล้ว (ทุกคนทายครบแล้ว) -> เริ่มรอบใหม่
+            const newTargetIndex = (newState.roundTargetIndex + 1) % activePlayerIds.length;
+            const newTargetId = activePlayerIds[newTargetIndex];
+                
+            // สร้างคิวใหม่สำหรับรอบใหม่ (ทุกคนที่ไม่ใช่เป้าหมายใหม่)
+            const newGuesserQueue = activePlayerIds.filter(pId => pId !== newTargetId);
+                
+            newState.roundTargetIndex = newTargetIndex;
+            newState.guesserQueue = newGuesserQueue;
+                
+            // เอาคนแรกในคิวใหม่มาเป็นคนทาย
             newState.currentGuesserId = newState.guesserQueue.shift();
+                
+            // ★★★ แก้ไขปัญหาสำคัญ: ล้างผลลัพธ์เก่าเมื่อขึ้นรอบใหม่ ★★★
+            newState.lastResult = null; 
         }
-
-        // อัปเดต State กลับขึ้นไปบน Firebase
-        gameRef.update(newState);
+    
+        // ส่งคืน State ที่อัปเดตแล้ว
+        return newState;
     });
 }
+
 
 function updateUI(state) {
     if (!state) return;
