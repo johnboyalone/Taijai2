@@ -8,15 +8,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500&family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-
-    <!-- ★★★ FIREBASE SDK (v9 Modular) ★★★ -->
-    <!-- เราจะ import โดยตรงจากใน script.js ที่เป็น module -->
-
 </head>
 <body>
     <div id="game-container">
-
-        <!-- ★★★ LOBBY SCREEN (หน้าใหม่) ★★★ -->
+        <!-- ★★★ LOBBY SCREEN ★★★ -->
         <div id="lobby-screen" class="screen">
             <h2>ทายเลขทายใจ ภาค 2</h2>
             <div class="lobby-group">
@@ -34,7 +29,7 @@
             <div id="lobby-error-msg"></div>
         </div>
 
-        <!-- ★★★ WAITING ROOM SCREEN (หน้าใหม่) ★★★ -->
+        <!-- ★★★ WAITING ROOM SCREEN ★★★ -->
         <div id="waiting-room-screen" class="screen hidden">
             <h2>ห้องรอเล่น</h2>
             <div class="room-code-area">
@@ -42,156 +37,21 @@
                 <button id="copy-room-code-btn">คัดลอก</button>
             </div>
             <h3>ผู้เล่นในห้อง:</h3>
-            <ul id="player-list-waiting">
-                <!-- รายชื่อผู้เล่นจะถูกเพิ่มที่นี่โดย script.js -->
-            </ul>
+            <ul id="player-list-waiting"></ul>
             <p id="waiting-status-text">รอผู้เล่นอื่นเข้าร่วม...</p>
             <button id="start-game-from-waiting-btn" class="btn-primary hidden">เริ่มเกม</button>
         </div>
-
-
-        <!-- Welcome Screen (ซ่อนไว้ก่อน อาจจะนำกลับมาใช้ทีหลัง) -->
-        <div id="welcome-screen" class="screen hidden">
-            <h1>ทายเลขทายใจ ภาค 2</h1>
-            <div class="rules">
-                <h3>กติกา</h3>
-                <p><strong>เป้าหมาย:</strong> ยืนหยัดเป็นผู้รอดชีวิตคนสุดท้าย!</p>
-                <p><strong>การเล่น:</strong> ในแต่ละรอบ จะมีผู้เล่น 1 คนถูกเลือกเป็น "เป้าหมาย" ผู้เล่นที่เหลือทั้งหมดจะต้องทาย "เลขลับ" ของเป้าหมาย</p>
-                <p><strong>การทาย:</strong>
-                    <br>- <strong>ทายถูกตำแหน่ง (Strike):</strong> คุณทายตัวเลขและตำแหน่งถูกต้อง
-                    <br>- <strong>ทายถูกเลข (Ball):</strong> คุณทายตัวเลขถูก แต่ตำแหน่งผิด
-                </p>
-                <p><strong>การกำจัด:</strong>
-                    <br>- หากคุณมั่นใจในเลขลับของเป้าหมาย กดปุ่ม <strong>"ตุยซะเถอะ!"</strong>
-                    <br>- <strong>ทายถูก:</strong> เป้าหมายจะถูกกำจัดออกจากเกมทันที!
-                    <br>- <strong>ทายผิด:</strong> คุณจะเสียพลังชีวิต 1 ดวง และถ้าพลังชีวิตหมด คุณจะแพ้!
-                </p>
-                 <p><strong>เงื่อนไขการแพ้:</strong>
-                    <br>- ถูกผู้เล่นอื่นกำจัดสำเร็จ
-                    <br>- พลังชีวิตหมดจากการทายผิด
-                    <br>- ไม่ทายเลขในเวลาที่กำหนด (จะเสียพลังชีวิต 1 ดวง)
-                </p>
-            </div>
-            <button id="show-setup-btn" class="btn-primary">เริ่มเกม (โหมดเล่นคนเดียว)</button>
-        </div>
-
-        <!-- Setup Screen (ซ่อนไว้ก่อน) -->
-        <div id="setup-screen" class="screen hidden">
-            <h2>ตั้งค่าเกม</h2>
-            <div class="setup-group">
-                <label>จำนวนผู้เล่น:</label>
-                <div id="player-count-selector" class="selector-container"></div>
-            </div>
-            <div class="setup-group">
-                <label>จำนวนหลัก:</label>
-                <div id="digit-count-selector" class="selector-container"></div>
-            </div>
-            <button id="start-game-btn" class="btn-primary">เริ่มเล่น</button>
-        </div>
-
-        <!-- Game Screen -->
-        <div id="game-screen" class="screen hidden">
-            <div id="status-header">
-                <div id="main-status-text">ตาของฉัน</div>
-                <div id="sub-status-text">เป้าหมาย: ผู้เล่น 2</div>
-            </div>
-
-            <div id="players-bar">
-                <!-- Player status boxes will be added here by script.js -->
-                <svg id="energy-beam-svg" class="hidden">
-                    <path id="energy-beam-path" d="M 0,0 L 0,0" />
-                </svg>
-                <div id="shout-guess-display" class="hidden"></div>
-            </div>
-
-            <div id="my-secret-number-area">
-                <div class="secret-label">เลขลับของคุณ (แตะเพื่อซ่อน/แสดง)</div>
-                <div id="my-secret-number-display">----</div>
-            </div>
-
-            <div id="timer-container">
-                <div id="timer-bar"></div>
-            </div>
-
-            <div id="display-area">
-                <div id="guess-display">----</div>
-            </div>
-
-            <div id="action-area">
-                <div id="keypad">
-                    <button class="key num">1</button>
-                    <button class="key num">2</button>
-                    <button class="key num">3</button>
-                    <button class="key num">4</button>
-                    <button class="key num">5</button>
-                    <button class="key num">6</button>
-                    <button class="key num">7</button>
-                    <button class="key num">8</button>
-                    <button class="key num">9</button>
-                    <button class="key action" id="clear-btn">ลบ</button>
-                    <button class="key num">0</button>
-                    <button class="key action" id="submit-guess-btn">ทาย</button>
-                </div>
-                <button class="key eliminate" id="eliminate-btn">ตุยซะเถอะ!</button>
-            </div>
-            <div id="skull-animation-container" class="hidden">💀</div>
-        </div>
-
-        <!-- Game Over Screen -->
-        <div id="game-over-screen" class="screen hidden">
-            <!-- Part 1: Winner Announcement -->
-            <div id="winner-announcement" class="game-over-part">
-                <h2 class="game-over-title">ผู้ชนะคือ...</h2>
-                <div class="winner-name-text" id="winner-name">ผู้เล่น 1</div>
-                <div class="winner-secret-label">เลขลับของผู้ชนะ</div>
-                <div class="winner-secret-text" id="winner-secret-number">1234</div>
-                <div class="next-prompt">แตะเพื่อไปต่อ...</div>
-            </div>
-
-            <!-- Part 2: Epithet Reveal -->
-            <div id="epithet-reveal" class="game-over-part hidden">
-                 <h2 class="game-over-title">ฉายาประจำเกม</h2>
-                 <div id="epithet-card-container">
-                    <div id="epithet-card-display" class="epithet-card hidden">
-                        <div class="epithet-main-content">
-                            <div class="epithet-player-name"></div>
-                            <div class="epithet-title"></div>
-                        </div>
-                        <div class="epithet-icon"></div>
-                        <div class="epithet-description"></div>
-                    </div>
-                 </div>
-                 <div class="next-prompt hidden">แตะเพื่อดูสรุปสถิติ...</div>
-            </div>
-
-            <!-- Part 3: Stats Table -->
-            <div id="stats-container" class="game-over-part hidden">
-                <h3>สรุปสถิติ</h3>
-                <div class="stats-table-wrapper">
-                    <table id="stats-table">
-                        <tbody id="stats-table-body"></tbody>
-                    </table>
-                </div>
-            </div>
-            <button id="restart-game-btn" class="btn-primary hidden">เล่นอีกครั้ง</button>
-        </div>
+            
+        <!-- หน้าจออื่นๆ จะถูกเพิ่มเข้ามาทีหลัง -->
+        <div id="game-screen" class="screen hidden"></div>
+        <div id="game-over-screen" class="screen hidden"></div>
     </div>
 
-    <!-- Floating UI Elements -->
-    <button id="popup-history-btn" class="hidden">
-        <span class="icon">📖</span>
-        <div class="preview-text"></div>
-    </button>
+    <!-- ★★★ FIREBASE SDK SCRIPT TAGS (วิธีที่ถูกต้อง) ★★★ -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js"></script>
 
-    <div id="history-popup-overlay">
-        <div id="history-popup">
-            <h3>ประวัติการทายของฉัน</h3>
-            <div id="history-filter-buttons"></div>
-            <ul id="history-popup-list"></ul>
-        </div>
-    </div>
-
-    <!-- ★★★ SCRIPT TAG ที่แก้ไขแล้ว ★★★ -->
-    <script type="module" src="script.js"></script>
+    <!-- ★★★ YOUR SCRIPT (ไม่ต้องใช้ type="module" แล้ว) ★★★ -->
+    <script src="script.js"></script>
 </body>
 </html>
