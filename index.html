@@ -1,57 +1,76 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ทายเลขทายใจ ภาค 2</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500&family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tajai - เกมทายเลข</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div id="game-container">
-        <!-- LOBBY SCREEN -->
-        <div id="lobby-screen" class="screen">
-            <h2>ทายเลขทายใจ ภาค 2</h2>
-            <div class="lobby-group">
-                <label for="player-name-input">ชื่อผู้เล่น:</label>
-                <input type="text" id="player-name-input" placeholder="ใส่ชื่อของคุณที่นี่..." maxlength="15">
-            </div>
-            <div class="lobby-group">
-                <button id="create-room-btn" class="btn-primary">สร้างห้อง</button>
-            </div>
-            <div class="lobby-or-divider"><span>หรือ</span></div>
-            <div class="lobby-group">
-                <input type="text" id="join-room-input" placeholder="ใส่รหัสห้อง..." maxlength="4">
-                <button id="join-room-btn" class="btn-secondary">เข้าร่วมห้อง</button>
-            </div>
-            <div id="lobby-error-msg"></div>
-        </div>
+  <!-- หน้าหลัก -->
+  <div id="lobby-screen" class="screen">
+    <h1>Tajai</h1>
+    <p>เกมทายเลข 4 หลัก ไม่ซ้ำกัน</p>
+    <div class="input-group">
+      <input type="text" id="player-name-input" placeholder="ชื่อของคุณ" maxlength="15" />
+    </div>
+    <div class="input-group">
+      <button id="create-room-btn">สร้างห้อง</button>
+      <input type="text" id="room-code-input" placeholder="รหัสห้อง" maxlength="4" />
+      <button id="join-room-btn">เข้าร่วม</button>
+    </div>
+    <p id="lobby-error" class="error"></p>
+  </div>
 
-        <!-- WAITING ROOM SCREEN -->
-        <div id="waiting-room-screen" class="screen hidden">
-            <h2>ห้องรอเล่น</h2>
-            <div class="room-code-area">
-                รหัสห้อง: <span id="room-code-text">----</span>
-                <button id="copy-room-code-btn">คัดลอก</button>
-            </div>
-            <h3>ผู้เล่นในห้อง:</h3>
-            <ul id="player-list-waiting"></ul>
-            <p id="waiting-status-text">รอผู้เล่นอื่นเข้าร่วม...</p>
-            <button id="start-game-from-waiting-btn" class="btn-primary hidden">เริ่มเกม</button>
-        </div>
-            
-        <!-- หน้าจออื่นๆ จะถูกเพิ่มเข้ามาทีหลัง -->
-        <div id="game-screen" class="screen hidden"></div>
-        <div id="game-over-screen" class="screen hidden"></div>
+  <!-- ห้องรอ -->
+  <div id="waiting-room-screen" class="screen hidden">
+    <h2>ห้องรอ</h2>
+    <p>รหัสห้อง: <span id="room-code-display"></span></p>
+    <button id="copy-room-code-btn">คัดลอกรหัส</button>
+    <ul id="player-list"></ul>
+    <button id="start-game-btn">เริ่มเกม</button>
+  </div>
+
+  <!-- หน้าเกม -->
+  <div id="game-screen" class="screen hidden">
+    <div class="status-area">
+      <h2 id="main-status-text">กำลังโหลด...</h2>
+      <p id="sub-status-text"></p>
     </div>
 
-    <!-- ★★★ FIREBASE SDK v8 SCRIPT TAGS (วิธีที่ถูกต้องและแน่นอน) ★★★ -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <div class="players-bar" id="players-bar"></div>
 
-    <!-- ★★★ YOUR SCRIPT ★★★ -->
-    <script src="script.js"></script>
+    <div class="my-info">
+      <h3>เลขลับของคุณ</h3>
+      <div class="secret-number" id="my-secret-number-display">----</div>
+    </div>
+
+    <div class="guess-area">
+      <div class="guess-display" id="guess-display">----</div>
+      <div class="keypad" id="keypad">
+        <button class="key num">1</button>
+        <button class="key num">2</button>
+        <button class="key num">3</button>
+        <button class="key num">4</button>
+        <button class="key num">5</button>
+        <button class="key num">6</button>
+        <button class="key num">7</button>
+        <button class="key num">8</button>
+        <button class="key num">9</button>
+        <button class="key clear" id="clear-btn">⌫</button>
+        <button class="key num">0</button>
+        <button class="key submit" id="submit-guess-btn">✓</button>
+      </div>
+    </div>
+
+    <div class="energy-beam" id="energy-beam"></div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <script src="script.js"></script>
 </body>
 </html>
