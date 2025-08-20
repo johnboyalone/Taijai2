@@ -27,7 +27,7 @@ const dom = {
     screens: { lobby: document.getElementById('lobby-screen'), waitingRoom: document.getElementById('waiting-room-screen'), game: document.getElementById('game-screen'), gameOver: document.getElementById('game-over-screen'), },
     lobby: { playerNameInput: document.getElementById('player-name-input'), createRoomBtn: document.getElementById('create-room-btn'), joinRoomInput: document.getElementById('join-room-input'), joinRoomBtn: document.getElementById('join-room-btn'), errorMsg: document.getElementById('lobby-error-msg'), },
     waitingRoom: { roomCodeText: document.getElementById('room-code-text'), copyRoomCodeBtn: document.getElementById('copy-room-code-btn'), playerList: document.getElementById('player-list-waiting'), statusText: document.getElementById('waiting-status-text'), startGameBtn: document.getElementById('start-game-from-waiting-btn'), },
-    game: document.getElementById('game-screen'), // เราจะสร้างเนื้อหาข้างในแบบไดนามิก
+    game: document.getElementById('game-screen'),
 };
 
 // --- HELPER FUNCTIONS ---
@@ -40,38 +40,50 @@ function generateSecretNumber(digitCount) {
     return digits.join('');
 }
 
+function checkGuess(guess, secret) {
+    let strikes = 0;
+    let balls = 0;
+    let guessChars = guess.split('');
+    let secretChars = secret.split('');
+    for (let i = guessChars.length - 1; i >= 0; i--) {
+        if (guessChars[i] === secretChars[i]) {
+            strikes++;
+            guessChars.splice(i, 1);
+            secretChars.splice(i, 1);
+        }
+    }
+    for (let i = 0; i < guessChars.length; i++) {
+        const foundIndex = secretChars.indexOf(guessChars[i]);
+        if (foundIndex !== -1) {
+            balls++;
+            secretChars.splice(foundIndex, 1);
+        }
+    }
+    return { strikes, balls };
+}
+
 // --- UI FUNCTIONS ---
 function showScreen(screenElement) {
     Object.values(dom.screens).forEach(s => s.classList.add('hidden'));
     screenElement.classList.remove('hidden');
 }
 
-// ★★★ ฟังก์ชันใหม่สำหรับส่ง Action การทาย ★★★
 function handleGuess() {
-    if (!currentGameId || currentLocalGuess.length !== 4) return; // สมมติว่า 4 หลัก
-    
+    if (!currentGameId || currentLocalGuess.length !== 4) return;
     const actionRef = database.ref(`games/${currentGameId}/actions`).push();
-    actionRef.set({
-        type: 'GUESS',
-        guesserId: myPlayerId,
-        guess: currentLocalGuess,
-    });
-
-    // ล้างช่องทายหลังจากส่งแล้ว
+    actionRef.set({ type: 'GUESS', guesserId: myPlayerId, guess: currentLocalGuess, timestamp: firebase.database.ServerValue.TIMESTAMP });
     currentLocalGuess = "";
     document.getElementById('guess-display').textContent = '----';
 }
 
-// ★★★ ฟังก์ชันใหม่สำหรับวาดหน้าจอเล่นเกม ★★★
 function updateGameScreenUI(state) {
-    const { players, roundTargetIndex, currentGuesserId } = state;
+    const { players, roundTargetIndex, currentGuesserId, lastResult } = state;
     const activePlayerIds = Object.keys(players).filter(pId => !players[pId].isEliminated);
     const targetId = activePlayerIds[roundTargetIndex];
     const myPlayer = players[myPlayerId];
     const guesser = players[currentGuesserId];
     const target = players[targetId];
 
-    // สร้าง HTML ของหน้าจอเล่นเกม (นำโค้ดจากเวอร์ชันออฟไลน์มาปรับใช้)
     dom.game.innerHTML = `
         <div id="status-header">
             <div id="main-status-text">${guesser.name} กำลังทาย</div>
@@ -88,12 +100,7 @@ function updateGameScreenUI(state) {
                 if (isTarget) playerClass += ' target';
                 if (isEliminated) playerClass += ' eliminated';
                 if (!isGuesser && !isTarget && !isEliminated) playerClass += ' inactive';
-                
-                return `
-                <div class="${playerClass}" data-player-id="${pId}">
-                    <div class="player-name">${p.name}</div>
-                    <div class="player-role">${isEliminated ? 'แพ้แล้ว 💀' : (isTarget ? 'เป้าหมาย' : `พลังชีวิต: ${p.eliminationTries} ❤️`)}</div>
-                </div>`;
+                return `<div class="${playerClass}" data-player-id="${pId}"><div class="player-name">${p.name}</div><div class="player-role">${isEliminated ? 'แพ้แล้ว 💀' : (isTarget ? 'เป้าหมาย' : `พลังชีวิต: ${p.eliminationTries} ❤️`)}</div></div>`;
             }).join('')}
         </div>
         <div id="my-secret-number-area">
@@ -101,7 +108,7 @@ function updateGameScreenUI(state) {
             <div id="my-secret-number-display">${isSecretNumberVisible ? myPlayer.secretNumber : '****'}</div>
         </div>
         <div id="timer-container"><div id="timer-bar"></div></div>
-        <div id="display-area"><div id="guess-display">----</div></div>
+        <div id="display-area"><div id="guess-display">${lastResult ? `${lastResult.strikes}S ${lastResult.balls}B` : '----'}</div></div>
         <div id="action-area">
             <div id="keypad">
                 ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'ลบ', 0, 'ทาย'].map(key => {
@@ -114,7 +121,6 @@ function updateGameScreenUI(state) {
         </div>
     `;
 
-    // ผูก Event Listener กับปุ่มที่สร้างขึ้นมาใหม่
     document.getElementById('my-secret-number-area').addEventListener('click', () => {
         isSecretNumberVisible = !isSecretNumberVisible;
         document.getElementById('my-secret-number-display').textContent = isSecretNumberVisible ? myPlayer.secretNumber : '****';
@@ -138,12 +144,10 @@ function updateGameScreenUI(state) {
         document.getElementById('submit-guess-btn').addEventListener('click', handleGuess);
     }
 
-    // ปิดการใช้งานปุ่มกดถ้าไม่ใช่ตาเรา
     keypad.style.pointerEvents = isMyTurn ? 'auto' : 'none';
     keypad.style.opacity = isMyTurn ? '1' : '0.5';
     document.getElementById('eliminate-btn').disabled = !isMyTurn;
 }
-
 
 // --- FIREBASE FUNCTIONS ---
 function createRoom() {
@@ -156,7 +160,10 @@ function createRoom() {
     myPlayerId = newPlayerRef.key;
     const gameRef = database.ref('games/' + gameRoomId);
     const initialGameState = { gameState: 'waiting', hostId: myPlayerId, players: { [myPlayerId]: { name: myPlayerName } }, };
-    gameRef.set(initialGameState).then(() => { listenToGameChanges(); });
+    gameRef.set(initialGameState).then(() => {
+        listenToGameChanges();
+        listenToActions(); // ★★★ Host เริ่มดักฟัง Action ★★★
+    });
 }
 
 function joinRoom() {
@@ -188,48 +195,77 @@ function listenToGameChanges() {
     });
 }
 
-// ★★★ ฟังก์ชัน startGame() ที่แก้ไขแล้ว ★★★
 function startGame() {
     if (!isHost || !currentGameId) return;
-    
     const gameRef = database.ref('games/' + currentGameId);
-        
-    // ใช้ .once() เพื่ออ่านข้อมูลล่าสุดแค่ครั้งเดียว
     gameRef.once('value').then((snapshot) => {
         const currentState = snapshot.val();
         const playerIds = Object.keys(currentState.players);
-    
-        // สร้างข้อมูลเริ่มต้นสำหรับผู้เล่นแต่ละคน
         const playersData = {};
         playerIds.forEach(pId => {
-            playersData[pId] = {
-                ...currentState.players[pId], // คงชื่อผู้เล่นไว้
-                secretNumber: generateSecretNumber(4), // สมมติว่าเล่น 4 หลัก
-                eliminationTries: INITIAL_ELIMINATION_TRIES,
-                isEliminated: false,
-            };
+            playersData[pId] = { ...currentState.players[pId], secretNumber: generateSecretNumber(4), eliminationTries: INITIAL_ELIMINATION_TRIES, isEliminated: false, };
         });
-    
-        // หา ID ของผู้เล่นคนแรกและคนที่สอง
         const firstPlayerId = playerIds[0];
         const secondPlayerId = playerIds.length > 1 ? playerIds[1] : null;
-    
-        // สร้างสถานะเริ่มต้นของเกม
         const initialPlayState = {
             gameState: 'playing',
             players: playersData,
-            roundTargetIndex: 0, // คนแรก (index 0) เป็นเป้าหมาย
-            guesserQueue: playerIds.filter(pId => pId !== firstPlayerId), // คนที่ไม่ใช่เป้าหมายจะอยู่ในคิว
-            currentGuesserId: secondPlayerId, // ให้คนที่สองเป็นคนทายคนแรก
+            roundTargetIndex: 0,
+            guesserQueue: playerIds.filter(pId => pId !== firstPlayerId),
+            currentGuesserId: secondPlayerId,
         };
-    
-        // ★★★ การแก้ไขที่สำคัญที่สุด ★★★
-        // อัปเดตสถานะเกมใน Firebase แล้วจบการทำงานของฟังก์ชันนี้เลย
-        // ไม่ต้องทำอะไรต่อ เพราะ Event Listener 'on("value")' จะเป็นคนจัดการอัปเดต UI เอง
         gameRef.update(initialPlayState);
     });
 }
 
+// ★★★ ฟังก์ชันใหม่สำหรับ Host เพื่อประมวลผล ★★★
+function listenToActions() {
+    if (!isHost || !currentGameId) return;
+    const actionsRef = database.ref(`games/${currentGameId}/actions`);
+    actionsRef.on('child_added', (snapshot) => {
+        const action = snapshot.val();
+        const actionId = snapshot.key;
+        if (action.type === 'GUESS') {
+            processGuess(action);
+        }
+        // ลบ Action ที่ประมวลผลแล้วออกไป
+        actionsRef.child(actionId).remove();
+    });
+}
+
+// ★★★ ฟังก์ชันใหม่สำหรับ Host เพื่อคำนวณผลลัพธ์ ★★★
+function processGuess(action) {
+    const gameRef = database.ref('games/' + currentGameId);
+    gameRef.once('value').then((snapshot) => {
+        let currentState = snapshot.val();
+        
+        const activePlayerIds = Object.keys(currentState.players).filter(pId => !currentState.players[pId].isEliminated);
+        const targetId = activePlayerIds[currentState.roundTargetIndex];
+        const targetPlayer = currentState.players[targetId];
+        const guesserPlayer = currentState.players[action.guesserId];
+
+        // คำนวณผลลัพธ์
+        const result = checkGuess(action.guess, targetPlayer.secretNumber);
+        
+        // สร้าง State ใหม่ที่จะอัปเดต
+        let newState = { ...currentState };
+        newState.lastResult = { guess: action.guess, ...result }; // เก็บผลลัพธ์ล่าสุดเพื่อแสดงผล
+
+        // เปลี่ยนตาคนทาย
+        if (newState.guesserQueue.length > 0) {
+            newState.currentGuesserId = newState.guesserQueue.shift();
+        } else {
+            // ถ้าทายครบทุกคนแล้ว ให้ขึ้นรอบใหม่
+            newState.roundTargetIndex = (newState.roundTargetIndex + 1) % activePlayerIds.length;
+            const newTargetId = activePlayerIds[newState.roundTargetIndex];
+            newState.guesserQueue = activePlayerIds.filter(pId => pId !== newTargetId);
+            newState.currentGuesserId = newState.guesserQueue.shift();
+        }
+
+        // อัปเดต State กลับขึ้นไปบน Firebase
+        gameRef.update(newState);
+    });
+}
 
 function updateUI(state) {
     if (!state) return;
@@ -238,7 +274,7 @@ function updateUI(state) {
         updateWaitingRoomUI(state);
     } else if (state.gameState === 'playing') {
         showScreen(dom.screens.game);
-        updateGameScreenUI(state); // ★★★ เรียกใช้ฟังก์ชันใหม่ ★★★
+        updateGameScreenUI(state);
     } else {
         showScreen(dom.screens.lobby);
     }
@@ -259,20 +295,4 @@ function updateWaitingRoomUI(state) {
         dom.waitingRoom.startGameBtn.disabled = !canStart;
     } else {
         dom.waitingRoom.statusText.textContent = 'รอเจ้าของห้องเริ่มเกม...';
-        dom.waitingRoom.startGameBtn.classList.add('hidden');
-    }
-}
-
-// --- EVENT LISTENERS ---
-function initializeApp() {
-    dom.lobby.createRoomBtn.addEventListener('click', createRoom);
-    dom.lobby.joinRoomBtn.addEventListener('click', joinRoom);
-    dom.waitingRoom.copyRoomCodeBtn.addEventListener('click', () => {
-        if (currentGameId) { navigator.clipboard.writeText(currentGameId).then(() => alert('คัดลอกรหัสห้องแล้ว!')); }
-    });
-    dom.waitingRoom.startGameBtn.addEventListener('click', startGame);
-    showScreen(dom.screens.lobby);
-}
-
-// --- START THE APP ---
-initializeApp();
+        dom.waitingRoom.startGameBtn.classList.add
