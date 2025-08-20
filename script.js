@@ -6,17 +6,14 @@ const firebaseConfig = {
   projectId: "taijai2",
   storageBucket: "taijai2.appspot.com",
   messagingSenderId: "111291976868",
-  appId: "1:11291976868:web:fee4606918ba2bbf93ea31"
+  appId: "1:111291976868:web:fee4606918ba2bbf93ea31"
 };
 
-// ★★★ INITIALIZE FIREBASE & DATABASE SERVICES ★★★
-// สังเกตว่าเราจะเรียกใช้ firebase.initializeApp และ firebase.database โดยตรง
-// ซึ่งตัวแปร firebase มาจาก script tag ใน index.html
-const app = firebase.initializeApp(firebaseConfig);
+// ★★★ INITIALIZE FIREBASE (v8 Syntax) ★★★
+firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// --- GAME CONFIG & STATE ---
-const INITIAL_ELIMINATION_TRIES = 3;
+// --- GAME STATE ---
 let myPlayerId = null;
 let myPlayerName = '';
 let currentGameId = null;
@@ -35,8 +32,8 @@ function showScreen(screenElement) {
     screenElement.classList.remove('hidden');
 }
 
-// --- FIREBASE COMMUNICATION & UI UPDATE FUNCTIONS ---
-async function createRoom() {
+// --- FIREBASE FUNCTIONS ---
+function createRoom() {
     myPlayerName = dom.lobby.playerNameInput.value.trim();
     if (!myPlayerName) {
         dom.lobby.errorMsg.textContent = 'กรุณาใส่ชื่อของคุณ';
@@ -46,7 +43,7 @@ async function createRoom() {
     isHost = true;
     const gameRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     currentGameId = gameRoomId;
-    
+        
     const newPlayerRef = database.ref('games/' + gameRoomId + '/players').push();
     myPlayerId = newPlayerRef.key;
 
@@ -54,15 +51,15 @@ async function createRoom() {
     const initialGameState = {
         gameState: 'waiting',
         hostId: myPlayerId,
-        players: { [myPlayerId]: { name: myPlayerName, isReady: true } },
-        gameConfig: { digitCount: 4, initialTries: INITIAL_ELIMINATION_TRIES },
+        players: { [myPlayerId]: { name: myPlayerName } },
     };
 
-    await gameRef.set(initialGameState);
-    listenToGameChanges();
+    gameRef.set(initialGameState).then(() => {
+        listenToGameChanges();
+    });
 }
 
-async function joinRoom() {
+function joinRoom() {
     myPlayerName = dom.lobby.playerNameInput.value.trim();
     if (!myPlayerName) {
         dom.lobby.errorMsg.textContent = 'กรุณาใส่ชื่อของคุณ';
@@ -75,23 +72,24 @@ async function joinRoom() {
     }
 
     const gameRef = database.ref('games/' + roomId);
-    const snapshot = await gameRef.once('value');
-
-    if (snapshot.exists()) {
-        const gameState = snapshot.val();
-        if (gameState.gameState !== 'waiting') {
-            dom.lobby.errorMsg.textContent = 'ไม่สามารถเข้าร่วมได้ เกมเริ่มไปแล้ว';
-            return;
+    gameRef.once('value').then((snapshot) => {
+        if (snapshot.exists()) {
+            const gameState = snapshot.val();
+            if (gameState.gameState !== 'waiting') {
+                dom.lobby.errorMsg.textContent = 'ไม่สามารถเข้าร่วมได้ เกมเริ่มไปแล้ว';
+                return;
+            }
+            isHost = false;
+            currentGameId = roomId;
+            const newPlayerRef = database.ref(`games/${roomId}/players`).push();
+            myPlayerId = newPlayerRef.key;
+            newPlayerRef.set({ name: myPlayerName }).then(() => {
+                listenToGameChanges();
+            });
+        } else {
+            dom.lobby.errorMsg.textContent = 'ไม่พบห้องเกมนี้';
         }
-        isHost = false;
-        currentGameId = roomId;
-        const newPlayerRef = database.ref(`games/${roomId}/players`).push();
-        myPlayerId = newPlayerRef.key;
-        await newPlayerRef.set({ name: myPlayerName, isReady: true });
-        listenToGameChanges();
-    } else {
-        dom.lobby.errorMsg.textContent = 'ไม่พบห้องเกมนี้';
-    }
+    });
 }
 
 function listenToGameChanges() {
@@ -115,7 +113,6 @@ function updateUI(state) {
         updateWaitingRoomUI(state);
     } else if (state.gameState === 'playing') {
         showScreen(dom.screens.game);
-        // เราจะวาดหน้าจอเกมในขั้นตอนต่อไป
     } else {
         showScreen(dom.screens.lobby);
     }
@@ -126,7 +123,7 @@ function updateWaitingRoomUI(state) {
     dom.waitingRoom.playerList.innerHTML = '';
     Object.values(state.players || {}).forEach(player => {
         const li = document.createElement('li');
-        li.textContent = player.name + (player.isReady ? ' (พร้อมแล้ว)' : '');
+        li.textContent = player.name;
         dom.waitingRoom.playerList.appendChild(li);
     });
     if (isHost) {
@@ -143,7 +140,6 @@ function updateWaitingRoomUI(state) {
 function initializeApp() {
     dom.lobby.createRoomBtn.addEventListener('click', createRoom);
     dom.lobby.joinRoomBtn.addEventListener('click', joinRoom);
-    // dom.waitingRoom.startGameBtn.addEventListener('click', startGameFromWaitingBtnClick); // จะเพิ่มทีหลัง
     dom.waitingRoom.copyRoomCodeBtn.addEventListener('click', () => {
         if (currentGameId) {
             navigator.clipboard.writeText(currentGameId).then(() => alert('คัดลอกรหัสห้องแล้ว!'));
