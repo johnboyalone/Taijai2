@@ -295,4 +295,20 @@ function updateWaitingRoomUI(state) {
         dom.waitingRoom.startGameBtn.disabled = !canStart;
     } else {
         dom.waitingRoom.statusText.textContent = 'รอเจ้าของห้องเริ่มเกม...';
-        dom.waitingRoom.startGameBtn.classList.add
+        dom.waitingRoom.startGameBtn.classList.add('hidden');
+    }
+}
+
+// --- EVENT LISTENERS ---
+function initializeApp() {
+    dom.lobby.createRoomBtn.addEventListener('click', createRoom);
+    dom.lobby.joinRoomBtn.addEventListener('click', joinRoom);
+    dom.waitingRoom.copyRoomCodeBtn.addEventListener('click', () => {
+        if (currentGameId) { navigator.clipboard.writeText(currentGameId).then(() => alert('คัดลอกรหัสห้องแล้ว!')); }
+    });
+    dom.waitingRoom.startGameBtn.addEventListener('click', startGame);
+    showScreen(dom.screens.lobby);
+}
+
+// --- START THE APP ---
+initializeApp();
