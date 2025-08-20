@@ -188,26 +188,48 @@ function listenToGameChanges() {
     });
 }
 
+// ★★★ ฟังก์ชัน startGame() ที่แก้ไขแล้ว ★★★
 function startGame() {
     if (!isHost || !currentGameId) return;
+    
     const gameRef = database.ref('games/' + currentGameId);
+        
+    // ใช้ .once() เพื่ออ่านข้อมูลล่าสุดแค่ครั้งเดียว
     gameRef.once('value').then((snapshot) => {
         const currentState = snapshot.val();
         const playerIds = Object.keys(currentState.players);
+    
+        // สร้างข้อมูลเริ่มต้นสำหรับผู้เล่นแต่ละคน
         const playersData = {};
         playerIds.forEach(pId => {
-            playersData[pId] = { ...currentState.players[pId], secretNumber: generateSecretNumber(4), eliminationTries: INITIAL_ELIMINATION_TRIES, isEliminated: false, };
+            playersData[pId] = {
+                ...currentState.players[pId], // คงชื่อผู้เล่นไว้
+                secretNumber: generateSecretNumber(4), // สมมติว่าเล่น 4 หลัก
+                eliminationTries: INITIAL_ELIMINATION_TRIES,
+                isEliminated: false,
+            };
         });
+    
+        // หา ID ของผู้เล่นคนแรกและคนที่สอง
+        const firstPlayerId = playerIds[0];
+        const secondPlayerId = playerIds.length > 1 ? playerIds[1] : null;
+    
+        // สร้างสถานะเริ่มต้นของเกม
         const initialPlayState = {
             gameState: 'playing',
             players: playersData,
-            roundTargetIndex: 0,
-            guesserQueue: playerIds.filter(pId => pId !== playerIds[0]),
-            currentGuesserId: playerIds[1],
+            roundTargetIndex: 0, // คนแรก (index 0) เป็นเป้าหมาย
+            guesserQueue: playerIds.filter(pId => pId !== firstPlayerId), // คนที่ไม่ใช่เป้าหมายจะอยู่ในคิว
+            currentGuesserId: secondPlayerId, // ให้คนที่สองเป็นคนทายคนแรก
         };
+    
+        // ★★★ การแก้ไขที่สำคัญที่สุด ★★★
+        // อัปเดตสถานะเกมใน Firebase แล้วจบการทำงานของฟังก์ชันนี้เลย
+        // ไม่ต้องทำอะไรต่อ เพราะ Event Listener 'on("value")' จะเป็นคนจัดการอัปเดต UI เอง
         gameRef.update(initialPlayState);
     });
 }
+
 
 function updateUI(state) {
     if (!state) return;
