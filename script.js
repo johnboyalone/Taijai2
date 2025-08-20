@@ -1,6 +1,6 @@
 // ★★★ FIREBASE SDK v9 SETUP ★★★
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, push, get, child } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+import { getDatabase, ref, set, onValue, get, child, push } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -8,7 +8,7 @@ const firebaseConfig = {
   authDomain: "taijai2.firebaseapp.com",
   databaseURL: "https://taijai2-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "taijai2",
-  storageBucket: "taijai2.appspot.com", // แก้ไขเป็น .appspot.com
+  storageBucket: "taijai2.appspot.com",
   messagingSenderId: "111291976868",
   appId: "1:111291976868:web:fee4606918ba2bbf93ea31"
 };
@@ -16,7 +16,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
-
 
 // --- GAME CONFIG & STATE ---
 const TIME_LIMIT = 20;
@@ -32,9 +31,6 @@ let isHost = false;
 let localState = {
     timerInterval: null,
     isSecretNumberVisible: true,
-    myLastThreeGuesses: [],
-    gameOverStep: 0,
-    isAdvancingGameOver: false,
 };
 
 // --- DOM ELEMENTS ---
@@ -42,8 +38,6 @@ const dom = {
     screens: {
         lobby: document.getElementById('lobby-screen'),
         waitingRoom: document.getElementById('waiting-room-screen'),
-        welcome: document.getElementById('welcome-screen'),
-        setup: document.getElementById('setup-screen'),
         game: document.getElementById('game-screen'),
         gameOver: document.getElementById('game-over-screen'),
     },
@@ -61,17 +55,6 @@ const dom = {
         statusText: document.getElementById('waiting-status-text'),
         startGameBtn: document.getElementById('start-game-from-waiting-btn'),
     },
-    buttons: {
-        showSetup: document.getElementById('show-setup-btn'),
-        startGame: document.getElementById('start-game-btn'),
-        restartGame: document.getElementById('restart-game-btn'),
-        eliminate: document.getElementById('eliminate-btn'),
-        popupHistory: document.getElementById('popup-history-btn'),
-    },
-    setup: {
-        playerCountSelector: document.getElementById('player-count-selector'),
-        digitCountSelector: document.getElementById('digit-count-selector'),
-    },
     game: {
         mainStatusText: document.getElementById('main-status-text'),
         subStatusText: document.getElementById('sub-status-text'),
@@ -84,21 +67,11 @@ const dom = {
         shoutGuessDisplay: document.getElementById('shout-guess-display'),
         energyBeamSvg: document.getElementById('energy-beam-svg'),
         energyBeamPath: document.getElementById('energy-beam-path'),
+        skullAnimationContainer: document.getElementById('skull-animation-container'),
     },
-    // ... (ส่วนที่เหลือของ dom elements เหมือนเดิม) ...
-    gameOver: {
-        winnerAnnouncement: document.getElementById('winner-announcement'),
-        winnerName: document.getElementById('winner-name'),
-        winnerSecretNumber: document.getElementById('winner-secret-number'),
-        epithetReveal: document.getElementById('epithet-reveal'),
-        epithetCardDisplay: document.getElementById('epithet-card-display'),
-        epithetPlayerName: document.querySelector('#epithet-card-display .epithet-player-name'),
-        epithetTitle: document.querySelector('#epithet-card-display .epithet-title'),
-        epithetIcon: document.querySelector('#epithet-card-display .epithet-icon'),
-        epithetDescription: document.querySelector('#epithet-card-display .epithet-description'),
-        nextPromptEpithet: document.querySelector('#epithet-reveal .next-prompt'),
-        statsContainer: document.getElementById('stats-container'),
-        statsTableBody: document.getElementById('stats-table-body'),
+    buttons: {
+        eliminate: document.getElementById('eliminate-btn'),
+        popupHistory: document.getElementById('popup-history-btn'),
     },
     popup: {
         overlay: document.getElementById('history-popup-overlay'),
@@ -109,7 +82,6 @@ const dom = {
         icon: document.querySelector('#popup-history-btn .icon'),
     }
 };
-
 
 // --- HELPER FUNCTIONS ---
 function generateSecretNumber(digitCount) {
@@ -155,8 +127,7 @@ function showScreen(screenElement) {
         dom.buttons.popupHistory.classList.add('hidden');
     }
 }
-
-// --- FIREBASE COMMUNICATION FUNCTIONS ---
+// --- FIREBASE COMMUNICATION & UI UPDATE FUNCTIONS ---
 
 async function createRoom() {
     myPlayerName = dom.lobby.playerNameInput.value.trim();
@@ -166,7 +137,8 @@ async function createRoom() {
     }
 
     isHost = true;
-    const newPlayerRef = push(ref(database, 'players')); // สร้าง ID ผู้เล่นที่ไม่ซ้ำกัน
+    // สร้าง ID ผู้เล่นที่ไม่ซ้ำกัน (ใช้ push ไปที่ path ที่ไม่มีอยู่จริงเพื่อเอา key)
+    const newPlayerRef = push(ref(database, 'players'));
     myPlayerId = newPlayerRef.key;
 
     const gameRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -177,15 +149,15 @@ async function createRoom() {
         gameState: 'waiting',
         hostId: myPlayerId,
         players: {
-            [myPlayerId]: {
-                name: myPlayerName,
-                isReady: true // Host พร้อมเสมอ
-            }
+            [myPlayerId]: { name: myPlayerName, isReady: true }
         },
         gameConfig: {
-            digitCount: 4,
-            initialTries: 3
-        }
+            digitCount: 4, // ค่าเริ่มต้น
+            initialTries: INITIAL_ELIMINATION_TRIES
+        },
+        // เพิ่ม path สำหรับ action และผลลัพธ์
+        lastAction: null,
+        lastResult: null,
     };
 
     await set(gameRef, initialGameState);
@@ -224,7 +196,6 @@ async function joinRoom() {
         await set(playerRef, { name: myPlayerName, isReady: true });
 
         listenToGameChanges();
-
     } else {
         dom.lobby.errorMsg.textContent = 'ไม่พบห้องเกมนี้';
     }
@@ -236,7 +207,6 @@ function listenToGameChanges() {
 
     onValue(gameRef, (snapshot) => {
         if (!snapshot.exists()) {
-            // อาจจะเกิดเมื่อ Host ออกแล้วลบห้อง
             alert("ห้องเกมถูกปิดแล้ว");
             window.location.reload();
             return;
@@ -246,9 +216,7 @@ function listenToGameChanges() {
     });
 }
 
-
 // --- MAIN UI UPDATE FUNCTION ---
-
 function updateUI(state) {
     if (!state) return;
 
@@ -261,7 +229,7 @@ function updateUI(state) {
         updateGameScreenUI(state);
     } else if (state.gameState === 'finished') {
         showScreen(dom.screens.gameOver);
-        // updateGameOverUI(state); // (จะทำในส่วนที่ 3)
+        // updateGameOverUI(state); // จะทำในอนาคต
     } else {
         showScreen(dom.screens.lobby);
     }
@@ -289,7 +257,7 @@ function updateWaitingRoomUI(state) {
 }
 
 function updateGameScreenUI(state) {
-    const { players, roundTargetId, currentGuesserId, gameConfig } = state;
+    const { players, roundTargetId, currentGuesserId, gameConfig, currentGuess } = state;
     const myPlayerData = players[myPlayerId];
     const target = players[roundTargetId];
     const guesser = players[currentGuesserId];
@@ -303,23 +271,28 @@ function updateGameScreenUI(state) {
     // Update my secret number
     dom.game.mySecretNumberDisplay.textContent = localState.isSecretNumberVisible ? myPlayerData.secretNumber : "*".repeat(gameConfig.digitCount);
 
+    // Update guess display
+    dom.game.guessDisplay.textContent = (currentGuess || "").padEnd(gameConfig.digitCount, '-');
+
     // Update players bar
     dom.game.playersBar.innerHTML = ''; // Clear bar
     dom.game.playersBar.appendChild(dom.game.energyBeamSvg); // Add beam SVG back
 
     Object.entries(players).forEach(([id, p]) => {
-        if (!p.isEliminated) { // แสดงเฉพาะผู้เล่นที่ยังไม่แพ้
-            const playerBox = document.createElement('div');
-            playerBox.className = 'player-status-box';
-            playerBox.dataset.playerId = id;
+        const playerBox = document.createElement('div');
+        playerBox.className = 'player-status-box';
+        playerBox.dataset.playerId = id;
 
+        if (p.isEliminated) {
+            playerBox.classList.add('eliminated');
+            playerBox.innerHTML = `<div class="player-name">${p.name}</div><div class="player-role">แพ้แล้ว 💀</div>`;
+        } else {
             if (id === currentGuesserId) playerBox.classList.add('guesser');
             if (id === roundTargetId) playerBox.classList.add('target');
             if (id !== currentGuesserId && id !== roundTargetId) playerBox.classList.add('inactive');
-
             playerBox.innerHTML = `<div class="player-name">${p.name}</div><div class="player-role">พลังชีวิต: ${p.eliminationTries} ❤️</div>`;
-            dom.game.playersBar.appendChild(playerBox);
         }
+        dom.game.playersBar.appendChild(playerBox);
     });
     
     dom.game.playersBar.appendChild(dom.game.shoutGuessDisplay); // Add shoutbox back
@@ -328,140 +301,210 @@ function updateGameScreenUI(state) {
     setTimeout(() => {
         const guesserElement = document.querySelector(`.player-status-box[data-player-id='${guesser.id}']`);
         const targetElement = document.querySelector(`.player-status-box[data-player-id='${target.id}']`);
-        // drawEnergyBeam(guesserElement, targetElement); // (จะทำในส่วนที่ 3)
+        drawEnergyBeam(guesserElement, targetElement);
     }, 50);
 
-    // Enable/disable keypad
+    // Enable/disable keypad for current player
     const isMyTurn = currentGuesserId === myPlayerId;
     dom.game.keypad.style.pointerEvents = isMyTurn ? 'auto' : 'none';
     dom.game.keypad.style.opacity = isMyTurn ? '1' : '0.5';
     dom.buttons.eliminate.disabled = !isMyTurn;
 }
-// --- GAME LOGIC FUNCTIONS (ONLINE VERSION) ---
+// --- UI ANIMATION FUNCTIONS ---
+
+function drawEnergyBeam(guesserElement, targetElement) {
+    const beamSvg = dom.game.energyBeamSvg;
+    const beamPath = dom.game.energyBeamPath;
+
+    if (!guesserElement || !targetElement) {
+        beamSvg.classList.add('hidden');
+        return;
+    }
+
+    const barRect = dom.game.playersBar.getBoundingClientRect();
+    const guesserRect = guesserElement.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+
+    const startX = guesserRect.left - barRect.left + guesserRect.width / 2;
+    const startY = guesserRect.top - barRect.top + guesserRect.height;
+    const endX = targetRect.left - barRect.left + targetRect.width / 2;
+    const endY = targetRect.top - barRect.top + targetRect.height;
+
+    beamPath.setAttribute('d', `M ${startX},${startY} L ${endX},${endY}`);
+    beamSvg.classList.remove('hidden');
+}
+
+function triggerSkullAnimation(playerId) {
+    const playerBox = document.querySelector(`.player-status-box[data-player-id='${playerId}']`);
+    if (!playerBox) return;
+
+    const skull = dom.game.skullAnimationContainer;
+    const playerRect = playerBox.getBoundingClientRect();
+    const containerRect = document.body.getBoundingClientRect();
+
+    // Set target position for the animation
+    const targetX = playerRect.left + playerRect.width / 2;
+    const targetY = playerRect.top + playerRect.height / 2;
+    document.documentElement.style.setProperty('--skull-target-x', `${targetX}px`);
+    document.documentElement.style.setProperty('--skull-target-y', `${targetY}px`);
+
+    skull.classList.remove('hidden');
+    skull.classList.add('animate');
+
+    setTimeout(() => {
+        skull.classList.remove('animate');
+        skull.classList.add('hidden');
+    }, 1500); // Animation duration
+}
+
+
+// --- PLAYER ACTION FUNCTIONS (CLIENT-SIDE) ---
+
+async function sendGuess(isElimination) {
+    const guessInput = dom.game.guessDisplay.textContent.replace(/-/g, '');
+    const gameRef = ref(database, `games/${currentGameId}`);
+    const snapshot = await get(gameRef);
+    if (!snapshot.exists()) return;
+    const state = snapshot.val();
+
+    if (guessInput.length !== state.gameConfig.digitCount) {
+        alert("กรุณาใส่เลขให้ครบทุกหลัก");
+        return;
+    }
+
+    const action = {
+        type: isElimination ? 'ELIMINATE' : 'GUESS',
+        playerId: myPlayerId,
+        guess: guessInput,
+        timestamp: Date.now()
+    };
+
+    // ส่ง action ขึ้นไปให้ Host ประมวลผล
+    await set(child(gameRef, 'lastAction'), action);
+}
+
+async function sendKeystroke(key) {
+    const gameRef = ref(database, `games/${currentGameId}`);
+    const snapshot = await get(gameRef);
+    if (!snapshot.exists()) return;
+    const state = snapshot.val();
+
+    let newGuess = state.currentGuess || '';
+    if (key === 'clear') {
+        newGuess = newGuess.slice(0, -1);
+    } else if (newGuess.length < state.gameConfig.digitCount) {
+        newGuess += key;
+    }
+
+    // อัปเดตการกดปุ่มแบบ real-time
+    await set(child(gameRef, 'currentGuess'), newGuess);
+}
+
+
+// --- GAME LOGIC FUNCTIONS (HOST-SIDE) ---
 
 async function startGameFromWaitingBtnClick() {
     if (!isHost || !currentGameId) return;
 
-    const gameRef = ref(database, 'games/' + currentGameId);
+    const gameRef = ref(database, 'games/'' + currentGameId);
     const snapshot = await get(gameRef);
     if (!snapshot.exists()) return;
 
     const currentState = snapshot.val();
     const playerIds = Object.keys(currentState.players);
 
-    // สร้างข้อมูลเริ่มต้นสำหรับผู้เล่นแต่ละคน (เลขลับ, พลังชีวิต)
     const startingPlayersData = {};
     playerIds.forEach(id => {
         startingPlayersData[id] = {
-            ...currentState.players[id], // คงชื่อเดิมไว้
+            ...currentState.players[id],
             secretNumber: generateSecretNumber(currentState.gameConfig.digitCount),
             eliminationTries: currentState.gameConfig.initialTries,
             isEliminated: false,
-            // ... สถิติอื่นๆ ...
+            orderOfElimination: 0,
         };
     });
 
-    // กำหนดตาแรกแบบสุ่ม
     const firstTargetIndex = Math.floor(Math.random() * playerIds.length);
     const firstTargetId = playerIds[firstTargetIndex];
     const guesserIds = playerIds.filter(id => id !== firstTargetId);
-    const firstGuesserId = guesserIds[0]; // ให้คนแรกใน list ที่ไม่ใช่เป้าหมายเป็นคนทายก่อน
+    const firstGuesserId = guesserIds[0];
 
-    // เตรียมข้อมูลที่จะอัปเดตขึ้น Firebase
     const updates = {
         gameState: 'playing',
+        hostId: currentState.hostId,
+        gameConfig: currentState.gameConfig,
         players: startingPlayersData,
         roundTargetId: firstTargetId,
         currentGuesserId: firstGuesserId,
-        guesserQueue: guesserIds.slice(1), // คนที่เหลือรอในคิว
-        currentGuess: ''
+        guesserQueue: guesserIds.slice(1),
+        currentGuess: '',
+        lastAction: null,
+        lastResult: null,
     };
 
-    // อัปเดตข้อมูลทั้งหมดขึ้น Firebase ในครั้งเดียว
     await set(gameRef, updates);
+}
+
+// ฟังก์ชันนี้จะถูกเรียกใช้โดย Host เมื่อมี Action ใหม่เข้ามา
+async function processPlayerAction(action, currentState) {
+    if (!isHost || !action) return;
+
+    const { type, playerId, guess } = action;
+    let newState = { ...currentState }; // Copy state to modify
+
+    // Logic for processing guess or elimination
+    // (จะเพิ่มในขั้นตอนต่อไป)
+
+    // อัปเดต state กลับขึ้นไปบน Firebase
+    const gameRef = ref(database, 'games/' + currentGameId);
+    await set(gameRef, newState);
 }
 
 
 // --- EVENT LISTENERS ---
-
 function initializeApp() {
-    // Lobby Screen Listeners
+    // Lobby Screen
     dom.lobby.createRoomBtn.addEventListener('click', createRoom);
     dom.lobby.joinRoomBtn.addEventListener('click', joinRoom);
 
-    // Waiting Room Listeners
+    // Waiting Room Screen
     dom.waitingRoom.startGameBtn.addEventListener('click', startGameFromWaitingBtnClick);
     dom.waitingRoom.copyRoomCodeBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(currentGameId).then(() => {
-            alert('คัดลอกรหัสห้องแล้ว!');
-        });
+        if (currentGameId) {
+            navigator.clipboard.writeText(currentGameId).then(() => {
+                alert('คัดลอกรหัสห้องแล้ว!');
+            });
+        }
     });
 
-    // Game Screen Listeners
+    // Game Screen
     dom.game.mySecretNumberArea.addEventListener('click', () => {
         localState.isSecretNumberVisible = !localState.isSecretNumberVisible;
-        // การอัปเดต UI จะเกิดขึ้นใน listenToGameChanges อยู่แล้ว
-        // แต่เราสามารถเรียก updateUI() เพื่อให้เห็นผลทันทีสำหรับเครื่องเราได้
-        // หรือจะปล่อยให้ Firebase อัปเดตกลับมาก็ได้
+        // Re-render with current state to update visibility
+        const gameRef = ref(database, 'games/' + currentGameId);
+        get(gameRef).then(snapshot => {
+            if (snapshot.exists()) {
+                updateGameScreenUI(snapshot.val());
+            }
+        });
     });
 
     dom.game.keypad.addEventListener('click', (e) => {
         if (!e.target.classList.contains('key')) return;
-        
-        const gameRef = ref(database, `games/${currentGameId}/currentGuess`);
-        
-        get(gameRef).then((snapshot) => {
-            let currentGuess = snapshot.val() || "";
-            if (e.target.classList.contains('num')) {
-                // สมมติว่า digitCount เก็บอยู่ใน gameConfig
-                // const digitCount = ...
-                // if (currentGuess.length < digitCount) {
-                    currentGuess += e.target.textContent;
-                // }
-            } else if (e.target.id === 'clear-btn') {
-                currentGuess = currentGuess.slice(0, -1);
-            }
-            set(gameRef, currentGuess); // อัปเดตการทายขึ้น Firebase ทันที
-            dom.game.guessDisplay.textContent = currentGuess.padEnd(4, '-'); // อัปเดต UI ทันทีเพื่อความรวดเร็ว
-        });
-
-        if (e.target.id === 'submit-guess-btn') {
-            // handleGuess(); // ฟังก์ชันนี้ต้องถูกสร้างใหม่สำหรับเวอร์ชันออนไลน์
+        if (e.target.classList.contains('num')) {
+            sendKeystroke(e.target.textContent);
+        } else if (e.target.id === 'clear-btn') {
+            sendKeystroke('clear');
+        } else if (e.target.id === 'submit-guess-btn') {
+            sendGuess(false);
         }
     });
 
-    // dom.buttons.eliminate.addEventListener('click', handleEliminationAttempt); // ต้องสร้างใหม่
+    dom.buttons.eliminate.addEventListener('click', () => sendGuess(true));
 
-    // แสดงหน้าจอแรก
+    // Start on the lobby screen
     showScreen(dom.screens.lobby);
 }
-
-
-// --- LEGACY FUNCTIONS (ต้องปรับปรุงหรืออาจจะไม่ใช้) ---
-// ฟังก์ชันเหล่านี้เป็นของเวอร์ชันเล่นคนเดียว ต้องนำมาปรับใช้กับเวอร์ชันออนไลน์
-// หรือสร้างฟังก์ชันใหม่ที่ทำงานกับ Firebase แทน
-
-function drawEnergyBeam(guesserElement, targetElement) {
-    const svg = dom.game.energyBeamSvg;
-    const path = dom.game.energyBeamPath;
-    if (!guesserElement || !targetElement) {
-        svg.classList.remove('visible');
-        return;
-    }
-    const barRect = dom.game.playersBar.getBoundingClientRect();
-    const guesserRect = guesserElement.getBoundingClientRect();
-    const targetRect = targetElement.getBoundingClientRect();
-    const startX = guesserRect.left - barRect.left + guesserRect.width / 2;
-    const startY = guesserRect.top - barRect.top + guesserRect.height / 2;
-    const endX = targetRect.left - barRect.left + targetRect.width / 2;
-    const endY = targetRect.top - barRect.top + targetRect.height / 2;
-    const pathData = `M ${startX},${startY} L ${endX},${endY}`;
-    path.setAttribute('d', pathData);
-    svg.classList.add('visible');
-}
-
-// ฟังก์ชันอื่นๆ เช่น triggerSkullAnimation, advanceGameOver, populateStatsTable
-// จะยังคงใช้ได้ แต่ต้องถูกเรียกใช้ในจังหวะที่ถูกต้องหลังจากได้รับข้อมูลจาก Firebase
 
 // --- START THE APP ---
 initializeApp();
