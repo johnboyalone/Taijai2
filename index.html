@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Code Breaker - รหัสลั บจับเพื่อน</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- หน้าจอหลักทั้งหมดของเกม -->
+    <div id="game-container">
+
+        <!-- 1. หน้าจอเริ่มต้น (Splash Screen) -->
+        <div id="splash-screen" class="screen active">
+            <div class="splash-content">
+                <h1>Code Breaker</h1>
+                <p>ถอดรหัสตัวเลข</p>
+                <button id="how-to-play-btn">วิธีการเล่น</button>
+                <p class="tap-to-start">แตะที่หน้าจอเพื่อเริ่ม</p>
+            </div>
+        </div>
+
+        <!-- 2. หน้าล็อบบี้ (Lobby Screen) -->
+        <div id="lobby-screen" class="screen">
+            <h2>ล็อบบี้</h2>
+            <input type="text" id="player-name-input" placeholder="ใส่ชื่อของคุณ" maxlength="15">
+            <div class="room-actions">
+                <button id="create-room-btn">สร้างห้อง</button>
+                <input type="text" id="join-room-input" placeholder="ใส่รหัสห้องเพื่อเข้าร่วม">
+                <button id="join-room-btn">เข้าร่วม</button>
+            </div>
+            <div id="room-list">
+                <!-- รายการห้องจะถูกสร้างโดย JavaScript -->
+            </div>
+        </div>
+        
+        <!-- 3. หน้าจอรอในห้อง (Waiting Room Screen) -->
+        <div id="waiting-room-screen" class="screen">
+            <h2 id="waiting-room-name"></h2>
+            <p>รหัสเข้าร่วม: <strong id="room-code-display"></strong></p>
+            <div id="player-list-waiting">
+                <!-- รายชื่อผู้เล่นที่รออยู่ -->
+            </div>
+            <p>รอผู้เล่นอื่น... (<span id="current-players">1</span>/<span id="max-players">6</span>)</p>
+            <button id="start-game-btn" class="host-only">เริ่มเกม</button>
+            <button id="leave-room-btn">ออกจากห้อง</button>
+        </div>
+
+        <!-- 4. หน้าจอเล่นเกมหลัก (Game Screen) -->
+        <div id="game-screen" class="screen">
+            <!-- โซนบน: สถานะ -->
+            <div class="top-zone">
+                <div id="turn-info">รอบทาย: Player 1</div>
+                <div id="timer">
+                    <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path id="timer-circle" class="timer-circle" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
+                    <span id="timer-text">20</span>
+                </div>
+            </div>
+
+            <!-- โซนกลาง: ผู้เล่น -->
+            <div id="players-display-area">
+                <!-- ไอคอนผู้เล่นจะถูกสร้างโดย JavaScript -->
+            </div>
+            <div id="guess-animation-area"></div>
+
+            <!-- โซนล่าง: แผงควบคุม -->
+            <div class="bottom-zone">
+                <div id="guess-input-display">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+                <div id="numpad">
+                    <!-- ปุ่มตัวเลขจะถูกสร้างโดย JavaScript -->
+                </div>
+                <div class="action-buttons">
+                    <button id="guess-btn" class="action-btn guess">ทาย</button>
+                    <button id="final-guess-btn" class="action-btn eliminate">สังหาร</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 5. หน้าจอจบเกม (End Game Screen) -->
+        <div id="end-game-screen" class="screen">
+            <div id="winner-animation"></div>
+            <h2 id="winner-name"></h2>
+            <h3>ฉายาประจำเกม</h3>
+            <div id="player-titles"></div>
+            <button id="play-again-btn">เล่นอีกครั้ง</button>
+        </div>
+
+    </div>
+
+    <!-- ส่วนประกอบ Pop-up และอื่นๆ -->
+    <div id="chat-popup" class="popup">
+        <div class="popup-header" id="chat-header">
+            แชท <span id="chat-notification" class="hidden"></span>
+        </div>
+        <div class="popup-content" id="chat-content">
+            <div id="chat-messages"></div>
+            <div id="ghost-chat-messages" class="hidden"></div>
+            <input type="text" id="chat-input" placeholder="พิมพ์ข้อความ...">
+        </div>
+    </div>
+
+    <div id="history-popup" class="popup">
+        <div class="popup-header" id="history-header">ประวัติการทาย</div>
+        <div class="popup-content" id="history-content">
+            <div id="history-player-tabs"></div>
+            <div id="history-display"></div>
+        </div>
+    </div>
+    
+    <div id="how-to-play-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>วิธีการเล่น</h2>
+            <p>1. ทุกคนมีรหัสลับ 4 หลัก</p>
+            <p>2. ทายรหัสของเป้าหมายในแต่ละรอบ</p>
+            <p>3. ผลลัพธ์: 🟢=ถูกเป๊ะ, 🟡=ถูกแต่ผิดตำแหน่ง</p>
+            <p>4. ไขรหัสเพื่อนให้ได้ หรือใช้ปุ่ม "สังหาร" เพื่อกำจัด!</p>
+            <p>5. ระวัง! ทายสังหารผิด หรือหมดเวลา จะเสีย 1 ชีวิต (มี 3 ชีวิต)</p>
+            <p>6. อยู่รอดเป็นคนสุดท้ายเพื่อชนะ!</p>
+        </div>
+    </div>
+    
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <p id="confirmation-text"></p>
+            <button id="confirm-yes-btn">ใช่</button>
+            <button id="confirm-no-btn">ไม่</button>
+        </div>
+    </div>
+
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <!-- โค้ดเกมหลัก -->
+    <script src="script.js"></script>
+
+</body>
+</html>

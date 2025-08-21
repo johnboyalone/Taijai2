@@ -1,0 +1,377 @@
+/* --- การตั้งค่าพื้นฐานและฟอนต์ --- */
+:root {
+    --bg-color: #F0FFF4; /* สีพื้นหลัง (Honeydew) */
+    --primary-color: #98D8C8; /* สีหลัก (Mint Green) */
+    --secondary-color: #FDFD96; /* สีไฮไลท์ (Pastel Yellow) */
+    --accent-color: #FF6B6B; /* สีสำหรับปุ่มอันตราย (Pastel Red) */
+    --text-color: #3A4F41; /* สีตัวอักษร (Dark Green-Gray) */
+    --white-color: #FFFFFF;
+    --gray-color: #D3D3D3;
+    --correct-color: #4CAF50; /* สีเขียวสำหรับ 'ถูกเป๊ะ' */
+    --misplaced-color: #FFC107; /* สีเหลืองสำหรับ 'เพี้ยน' */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    width: 100%;
+    height: 100%;
+    max-width: 480px; /* ขนาดหน้าจอมือถือส่วนใหญ่ */
+    position: relative;
+    background-color: var(--white-color);
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+/* --- โครงสร้างหน้าจอ (Screen) --- */
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: transform 0.5s ease-in-out, opacity 0.5s;
+    transform: translateX(100%);
+    opacity: 0;
+    visibility: hidden;
+}
+
+.screen.active {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+/* --- สไตล์ปุ่มและ Input --- */
+button, input[type="text"] {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-size: 16px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--primary-color);
+    margin: 8px 0;
+    width: 80%;
+    max-width: 300px;
+}
+
+button {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #7fbfb0;
+}
+
+input[type="text"] {
+    background-color: var(--white-color);
+}
+
+/* --- หน้าจอ Splash และ Lobby --- */
+#splash-screen h1 {
+    font-size: 48px;
+    color: var(--primary-color);
+}
+.tap-to-start {
+    margin-top: 30px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* --- หน้าจอเล่นเกม (Game Screen) --- */
+#game-screen {
+    justify-content: space-between;
+}
+
+.top-zone {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+}
+
+#turn-info {
+    font-size: 18px;
+    font-weight: bold;
+    background-color: var(--secondary-color);
+    padding: 5px 15px;
+    border-radius: 15px;
+}
+
+#timer {
+    position: relative;
+    width: 50px;
+    height: 50px;
+}
+
+.timer-svg {
+    transform: rotate(-90deg);
+}
+
+.timer-circle-bg {
+    fill: none;
+    stroke: var(--gray-color);
+    stroke-width: 4;
+}
+
+.timer-circle {
+    fill: none;
+    stroke: var(--primary-color);
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+}
+
+#timer-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    font-weight: bold;
+}
+
+#players-display-area {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    width: 100%;
+    padding: 10px;
+}
+
+.player-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.player-icon.dead {
+    opacity: 0.4;
+}
+
+.player-icon.dead .player-avatar::after {
+    content: '👻';
+    position: absolute;
+    font-size: 24px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.player-icon.target {
+    border-color: var(--accent-color);
+    transform: scale(1.1);
+}
+
+.player-icon.guesser {
+    border-color: var(--secondary-color);
+}
+
+.player-avatar {
+    width: 50px;
+    height: 50px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--white-color);
+    position: relative;
+}
+
+.player-name {
+    margin-top: 5px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.player-lives {
+    font-size: 16px;
+}
+
+.bottom-zone {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 10px;
+}
+
+#guess-input-display {
+    display: flex;
+    margin-bottom: 15px;
+}
+
+#guess-input-display span {
+    width: 40px;
+    height: 50px;
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    margin: 0 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+#numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 80%;
+    max-width: 300px;
+}
+
+#numpad button {
+    width: 100%;
+    height: 50px;
+    font-size: 20px;
+    padding: 0;
+    background-color: var(--bg-color);
+}
+
+.action-buttons {
+    display: flex;
+    width: 80%;
+    max-width: 300px;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.action-btn {
+    flex: 1;
+}
+
+.action-btn.eliminate {
+    background-color: var(--accent-color);
+    color: var(--white-color);
+}
+
+/* --- Popups (Chat & History) --- */
+.popup {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 60px;
+    height: 60px;
+    background-color: var(--primary-color);
+    border-radius: 30px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    overflow: hidden;
+}
+
+.popup.open {
+    width: 95%;
+    height: 70%;
+    left: 2.5%;
+    bottom: 10px;
+    border-radius: 15px;
+    cursor: default;
+}
+
+.popup-header {
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-color);
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.popup.open .popup-header {
+    justify-content: flex-start;
+    padding-left: 20px;
+}
+
+.popup-content {
+    padding: 10px;
+    height: calc(100% - 60px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s;
+}
+
+.popup.open .popup-content {
+    opacity: 1;
+    visibility: visible;
+}
+
+#history-popup {
+    left: auto;
+    right: 10px;
+}
+
+/* --- Modals --- */
+.modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s;
+}
+
+.modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: var(--white-color);
+    padding: 30px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.hidden {
+    display: none !important;
+}
