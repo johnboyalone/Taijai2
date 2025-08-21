@@ -16,4 +16,4 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
-          projectId: 'taijai2' # <-- ใส่ตรงนี้เรียบร้อยแล้ว
+          projectId: 'taijai2'
