@@ -29,6 +29,7 @@ const buttons = {
     readyUp: document.getElementById('btn-ready-up'),
 };
 
+const playerNameInput = document.getElementById('player-name-input');
 const roomListContainer = document.getElementById('room-list');
 const keypadContainer = document.querySelector('.keypad');
 const gameRoomName = document.getElementById('game-room-name');
@@ -40,6 +41,7 @@ const keypadControls = document.getElementById('keypad-controls');
 const gameDisplay = document.getElementById('game-display');
 const turnIndicator = document.getElementById('turn-indicator');
 
+let playerName = '';
 let currentInput = '';
 let currentPlayerId = `player_${Math.random().toString(36).substr(2, 9)}`;
 let currentRoomId = null;
@@ -106,7 +108,7 @@ function loadRooms() {
 
 function createRoom() {
     const roomName = prompt("กรุณาตั้งชื่อห้อง:", "ห้องทายเลข");
-    if (!roomName) return;
+    if (!roomName || roomName.trim() === '') return;
 
     const roomsRef = ref(database, 'rooms');
     const newRoomRef = push(roomsRef);
@@ -127,7 +129,7 @@ function joinRoom(roomId) {
     const roomRef = ref(database, `rooms/${roomId}`);
     const playerRef = ref(database, `rooms/${roomId}/players/${currentPlayerId}`);
 
-    set(playerRef, { name: `ผู้เล่น ${currentPlayerId.substring(0, 3)}`, status: 'WAITING' })
+    set(playerRef, { name: playerName, status: 'WAITING' })
         .then(() => {
             onDisconnect(playerRef).remove();
             navigateTo('game');
@@ -153,7 +155,7 @@ function handleReadyUp() {
     const secretNumber = generateSecretNumber();
     const playerRef = ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}`);
     set(playerRef, {
-        name: `ผู้เล่น ${currentPlayerId.substring(0, 3)}`,
+        name: playerName,
         status: 'READY',
         secretNumber: secretNumber
     });
@@ -181,7 +183,7 @@ function resetGameUI() {
 function handleRoomUpdate(snapshot) {
     const roomData = snapshot.val();
     if (!roomData) {
-        alert("ห้องนี้ถูกปิดแล้ว กลับไปที่ล็อบบี้");
+        alert("ห้องนี้ถูกปิดแล้ว หรือคุณถูกตัดการเชื่อมต่อ กลับไปที่ล็อบบี้");
         leaveRoom();
         return;
     }
@@ -239,17 +241,28 @@ function handleRoomUpdate(snapshot) {
 }
 
 buttons.goToLobby.addEventListener('click', () => {
+    const name = playerNameInput.value.trim();
+    if (name === '') {
+        alert('กรุณาตั้งชื่อของคุณก่อน!');
+        return;
+    }
+    playerName = name;
     navigateTo('lobby');
     loadRooms();
 });
+
 buttons.createRoom.addEventListener('click', createRoom);
 buttons.leaveRoom.addEventListener('click', leaveRoom);
 buttons.delete.addEventListener('click', handleDelete);
 buttons.readyUp.addEventListener('click', handleReadyUp);
 buttons.guess.addEventListener('click', () => {
+    if (currentInput.length !== 4) {
+        alert('กรุณากรอกเลขให้ครบ 4 หลัก');
+        return;
+    }
     alert(`ทายเลข: ${currentInput}`);
     currentInput = '';
     gameDisplay.textContent = '';
 });
 
-console.log("Application Initialized");
+navigateTo('home');
