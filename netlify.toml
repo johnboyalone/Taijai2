@@ -1,0 +1,10 @@
+# Netlify Configuration File
+# This tells Netlify exactly how to build the site.
+
+[build]
+  # We leave the command empty because this is a static site.
+  # This prevents Netlify from running "npm install".
+  command = ""
+      
+  # We leave the publish directory empty to use the root.
+  publish = ""
