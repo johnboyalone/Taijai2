@@ -7,75 +7,87 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <div class="app-container">
-
-        <div id="page-home" class="page active">
-            <div class="content-box">
-                <h1>เกมทายเลข</h1>
-                <p>ทายตัวเลข 4 หลักของเพื่อนให้ถูก!</p>
-                <div class="input-group">
-                    <label for="player-name-input">กรุณาตั้งชื่อของคุณ:</label>
-                    <input type="text" id="player-name-input" class="input-field" placeholder="ชื่อผู้เล่น" maxlength="15">
-                </div>
-                <button id="btn-go-to-lobby" class="button primary">เข้าสู่ล็อบบี้</button>
+    <div class="container">
+        <!-- ===== หน้าแรก (Home) ===== -->
+        <div id="page-home" class="page">
+            <h1>เกมทายเลข</h1>
+            <p>ทายเลขลับ 4 หลักที่ไม่ซ้ำกันของเพื่อนคุณ!</p>
+            <div class="input-group">
+                <label for="input-player-name">กรุณาตั้งชื่อของคุณ:</label>
+                <input type="text" id="input-player-name" placeholder="ชื่อผู้เล่น..." maxlength="15">
             </div>
+            <button id="btn-go-to-lobby" class="btn btn-primary">เข้าสู่ล็อบบี้</button>
         </div>
 
-        <div id="page-lobby" class="page">
-            <div class="content-box">
-                <h2>เลือกห้อง</h2>
-                <div id="room-list" class="room-list">
-                    <p>กำลังโหลดห้อง...</p>
-                </div>
-                <button id="btn-create-room" class="button">สร้างห้องใหม่</button>
+        <!-- ===== หน้าล็อบบี้ (Lobby) ===== -->
+        <div id="page-lobby" class="page" style="display: none;">
+            <h2>เลือกห้องเพื่อเข้าร่วม</h2>
+            <div id="room-list" class="room-list-container">
+                <!-- รายการห้องจะถูกสร้างโดย JavaScript -->
             </div>
+            <button id="btn-create-room" class="btn btn-secondary">สร้างห้องใหม่</button>
         </div>
 
-        <div id="page-game" class="page">
-            <div class="content-box">
-                <h2 id="game-room-name">ห้อง: ...</h2>
-
-                <div id="setup-section">
-                    <h3>พร้อมที่จะเล่นหรือยัง?</h3>
-                    <p>กดปุ่มด้านล่างเพื่อสุ่มเลขลับ 4 หลัก<br>และเตรียมพร้อมเข้าสู่เกม</p>
-                    <button id="btn-ready-up" class="button primary">สุ่มเลขลับและเริ่มเลย!</button>
+        <!-- ===== หน้าเกม (Game) ===== -->
+        <div id="page-game" class="page" style="display: none;">
+            <h2 id="game-room-name">ห้อง: ...</h2>
+            
+            <!-- ส่วนตั้งค่าก่อนเริ่มเกม -->
+            <div id="setup-section">
+                <h3>ตั้งค่าเลขลับ 4 หลักของคุณ</h3>
+                <p>ผู้เล่นอื่นจะไม่เห็นเลขนี้</p>
+                <div class="secret-number-display">
+                    <span>เลขลับของคุณคือ: </span>
+                    <strong id="secret-number-display-text">????</strong>
                 </div>
+                <button id="btn-ready-up" class="btn btn-primary">ฉันพร้อมแล้ว!</button>
+            </div>
 
-                <div id="waiting-section" class="hidden">
-                    <h3>ยอดเยี่ยม!</h3>
-                    <p>กำลังรอผู้เล่นคนอื่นตั้งค่า...</p>
-                    <div class="loader"></div>
-                </div>
+            <!-- ส่วนรอผู้เล่นคนอื่น -->
+            <div id="waiting-section" style="display: none;">
+                <h3>ยอดเยี่ยม!</h3>
+                <p>กำลังรอผู้เล่นคนอื่นตั้งค่า...</p>
+                <div class="loader"></div>
+            </div>
 
-                <div id="gameplay-section" class="hidden">
-                    <h3 id="turn-indicator">ตาของ: ...</h3>
-                    <div id="game-display" class="display-box"></div>
-                </div>
-
-                <div class="player-status-box">
-                    <h4>ผู้เล่นในห้อง</h4>
-                    <ul id="player-list">
-                    </ul>
-                </div>
-
-                <div id="keypad-controls" class="hidden">
-                     <div class="keypad"></div>
-                     <div class="controls">
-                        <button id="btn-delete" class="button secondary">ลบ</button>
-                        <button id="btn-guess" class="button primary guess">ทาย</button>
+            <!-- ส่วนเล่นเกม (ยังไม่ใช้งาน) -->
+            <div id="gameplay-section" style="display: none;">
+                <h3>ตาของคุณ: <span id="turn-player-name">...</span></h3>
+                <div id="game-display" class="game-display"></div>
+                <div id="keypad-controls">
+                    <div class="keypad">
+                        <button data-key="1">1</button>
+                        <button data-key="2">2</button>
+                        <button data-key="3">3</button>
+                        <button data-key="4">4</button>
+                        <button data-key="5">5</button>
+                        <button data-key="6">6</button>
+                        <button data-key="7">7</button>
+                        <button data-key="8">8</button>
+                        <button data-key="9">9</button>
+                        <button data-key="0">0</button>
+                    </div>
+                    <div class="keypad-actions">
+                        <button id="btn-delete" class="btn btn-secondary">ลบ</button>
+                        <button id="btn-guess" class="btn btn-primary">ทาย</button>
                     </div>
                 </div>
-
-                <button id="btn-leave-room" class="button danger">ออกจากห้อง</button>
             </div>
-        </div>
 
+            <div class="player-list-box">
+                <h4>ผู้เล่นในห้อง</h4>
+                <div id="player-list">
+                    <!-- รายชื่อผู้เล่น -->
+                </div>
+            </div>
+            <button id="btn-leave-room" class="btn btn-danger">ออกจากห้อง</button>
+        </div>
     </div>
 
-    <script type="module" src="script.js"></script>
+    <script src="script.js" type="module"></script>
 </body>
 </html>
