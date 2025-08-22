@@ -1,10 +1,13 @@
 {
-  "hosting": {
-    "public": ".",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
+  "name": "taijai2",
+  "version": "1.0.0",
+  "description": "A number guessing game using Firebase.",
+  "main": "script.js",
+  "scripts": {
+    "start": "firebase serve",
+    "deploy": "firebase deploy"
+  },
+  "dependencies": {
+    "firebase": "^9.0.0" 
   }
 }
