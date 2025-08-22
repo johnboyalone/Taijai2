@@ -44,6 +44,7 @@ const waitingSection = document.getElementById('waiting-section');
 const gameplaySection = document.getElementById('gameplay-section');
 const keypadControls = document.getElementById('keypad-controls');
 const gameDisplay = document.getElementById('game-display');
+const secretNumberDisplayText = document.getElementById('secret-number-display-text');
 
 let currentPlayerId = sessionStorage.getItem('playerId');
 if (!currentPlayerId) {
@@ -56,6 +57,7 @@ let playerName = '';
 let currentInput = '';
 let playerRef = null;
 let roomRef = null;
+let roomUnsubscribe = null; // ตัวแปรสำหรับยกเลิกการฟังข้อมูล
 
 function navigateTo(pageName) {
     Object.values(pages).forEach(page => page.style.display = 'none');
@@ -135,7 +137,8 @@ function joinRoom(roomId) {
         .then(() => {
             onDisconnect(playerRef).remove();
             navigateTo('game');
-            onValue(roomRef, handleRoomUpdate);
+            if (roomUnsubscribe) roomUnsubscribe(); // ยกเลิกการฟังเก่าก่อน
+            roomUnsubscribe = onValue(roomRef, handleRoomUpdate);
         })
         .catch(error => console.error("เข้าร่วมห้องไม่สำเร็จ:", error));
 }
@@ -144,19 +147,20 @@ function leaveRoom() {
     if (playerRef) {
         remove(playerRef);
     }
-    if (roomRef) {
-        onValue(roomRef, () => {}, { onlyOnce: true }); // Unsubscribe
+    if (roomUnsubscribe) {
+        roomUnsubscribe(); // ยกเลิกการฟังข้อมูลห้อง
+        roomUnsubscribe = null;
     }
     playerRef = null;
     roomRef = null;
     currentRoomId = null;
-    navigateTo('lobby');
+    navigateTo('lobby'); // กลับไปหน้าล็อบบี้
 }
 
 function handleRoomUpdate(snapshot) {
     const roomData = snapshot.val();
     if (!roomData) {
-        alert("ห้องถูกปิดแล้ว กลับสู่หน้าล็อบบี้");
+        alert("ห้องถูกปิดแล้ว หรือคุณได้ออกจากห้องแล้ว");
         leaveRoom();
         return;
     }
@@ -165,13 +169,14 @@ function handleRoomUpdate(snapshot) {
     const players = roomData.players || {};
     const playerCount = Object.keys(players).length;
 
-    if (playerCount === 0) {
+    if (playerCount === 0 && currentRoomId) {
         remove(ref(database, `rooms/${currentRoomId}`));
         return;
     }
 
     const me = players[currentPlayerId];
     if (!me) {
+        // ถ้าไม่เจอข้อมูลตัวเองในห้อง อาจเป็นเพราะเพิ่งกดออก
         return;
     }
 
@@ -191,9 +196,15 @@ function handleRoomUpdate(snapshot) {
     const allReady = Object.values(players).every(p => p.isReady);
 
     if (roomData.status === 'WAITING') {
-        setupSection.style.display = 'block';
-        waitingSection.style.display = 'none';
+        if (me.isReady) {
+            setupSection.style.display = 'none';
+            waitingSection.style.display = 'block';
+        } else {
+            setupSection.style.display = 'block';
+            waitingSection.style.display = 'none';
+        }
         gameplaySection.style.display = 'none';
+        
         if (allReady && playerCount >= 2) {
             set(ref(database, `rooms/${currentRoomId}/status`), 'PLAYING');
         }
@@ -206,11 +217,13 @@ function handleRoomUpdate(snapshot) {
 
 function handleReadyUp() {
     const secretNumber = generateSecretNumber();
-    set(ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}/secretNumber`), secretNumber);
-    set(ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}/isReady`), true);
+    secretNumberDisplayText.textContent = secretNumber; // แสดงเลขลับให้ผู้เล่นเห็น
     
-    setupSection.style.display = 'none';
-    waitingSection.style.display = 'block';
+    const updates = {};
+    updates[`rooms/${currentRoomId}/players/${currentPlayerId}/secretNumber`] = secretNumber;
+    updates[`rooms/${currentRoomId}/players/${currentPlayerId}/isReady`] = true;
+    
+    set(ref(database), updates);
 }
 
 function generateSecretNumber() {
@@ -237,14 +250,7 @@ function handleDelete() {
     gameDisplay.textContent = currentInput;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const savedPlayerName = sessionStorage.getItem('playerName');
-    if (savedPlayerName) {
-        inputs.playerName.value = savedPlayerName;
-    }
-    navigateTo('home');
-});
-
+// --- Event Listeners ---
 buttons.goToLobby.addEventListener('click', goToLobby);
 buttons.createRoom.addEventListener('click', createRoom);
 buttons.leaveRoom.addEventListener('click', leaveRoom);
@@ -260,4 +266,14 @@ buttons.guess.addEventListener('click', () => {
     alert(`ทายเลข: ${currentInput}`);
     currentInput = '';
     gameDisplay.textContent = '';
+});
+
+// --- Initial Load ---
+document.addEventListener('DOMContentLoaded', () => {
+    const savedPlayerName = sessionStorage.getItem('playerName');
+    if (savedPlayerName) {
+        inputs.playerName.value = savedPlayerName;
+        playerName = savedPlayerName;
+    }
+    navigateTo('home');
 });
