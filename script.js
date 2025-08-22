@@ -1,5 +1,7 @@
+// script.js
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, onValue, push, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, set, onValue, push, onDisconnect, serverTimestamp, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyANK5rvwlgWc11EvXQRXpsSOO-tGV29pKA",
@@ -29,7 +31,10 @@ const buttons = {
     readyUp: document.getElementById('btn-ready-up'),
 };
 
-const playerNameInput = document.getElementById('player-name-input');
+const inputs = {
+    playerName: document.getElementById('input-player-name'),
+};
+
 const roomListContainer = document.getElementById('room-list');
 const keypadContainer = document.querySelector('.keypad');
 const gameRoomName = document.getElementById('game-room-name');
@@ -39,47 +44,36 @@ const waitingSection = document.getElementById('waiting-section');
 const gameplaySection = document.getElementById('gameplay-section');
 const keypadControls = document.getElementById('keypad-controls');
 const gameDisplay = document.getElementById('game-display');
-const turnIndicator = document.getElementById('turn-indicator');
 
+let currentPlayerId = sessionStorage.getItem('playerId');
+if (!currentPlayerId) {
+    currentPlayerId = `player_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    sessionStorage.setItem('playerId', currentPlayerId);
+}
+
+let currentRoomId = null;
 let playerName = '';
 let currentInput = '';
-let currentPlayerId = `player_${Math.random().toString(36).substr(2, 9)}`;
-let currentRoomId = null;
-let roomUnsubscribe = null;
+let playerRef = null;
+let roomRef = null;
 
 function navigateTo(pageName) {
-    Object.values(pages).forEach(page => page.classList.remove('active'));
+    Object.values(pages).forEach(page => page.style.display = 'none');
     if (pages[pageName]) {
-        pages[pageName].classList.add('active');
+        pages[pageName].style.display = 'block';
     }
 }
 
-function createKeypad() {
-    keypadContainer.innerHTML = '';
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', ''];
-    keys.forEach(keyText => {
-        if (keyText === '') {
-            keypadContainer.appendChild(document.createElement('div'));
-        } else {
-            const keyElement = document.createElement('button');
-            keyElement.className = 'key';
-            keyElement.textContent = keyText;
-            keyElement.addEventListener('click', () => handleKeyPress(keyText));
-            keypadContainer.appendChild(keyElement);
-        }
-    });
-}
-
-function handleKeyPress(key) {
-    if (currentInput.length < 4) {
-        currentInput += key;
-        gameDisplay.textContent = currentInput;
+function goToLobby() {
+    const name = inputs.playerName.value.trim();
+    if (!name) {
+        alert('กรุณาตั้งชื่อผู้เล่นของคุณ');
+        return;
     }
-}
-
-function handleDelete() {
-    currentInput = currentInput.slice(0, -1);
-    gameDisplay.textContent = currentInput;
+    playerName = name;
+    sessionStorage.setItem('playerName', playerName);
+    navigateTo('lobby');
+    loadRooms();
 }
 
 function loadRooms() {
@@ -88,20 +82,19 @@ function loadRooms() {
         roomListContainer.innerHTML = '';
         const rooms = snapshot.val();
         if (rooms) {
-            Object.keys(rooms).forEach(roomId => {
-                const roomData = rooms[roomId];
-                const playerCount = roomData.players ? Object.keys(roomData.players).length : 0;
-                if (playerCount >= 6 || roomData.status === 'PLAYING') return;
-
-                const roomElement = document.createElement('div');
-                roomElement.className = 'room-item';
-                roomElement.textContent = `${roomData.name} (${playerCount}/6)`;
-                roomElement.addEventListener('click', () => joinRoom(roomId));
-                roomListContainer.appendChild(roomElement);
+            Object.entries(rooms).forEach(([roomId, roomData]) => {
+                if (roomData.status === 'WAITING') {
+                    const roomElement = document.createElement('div');
+                    roomElement.className = 'room-item';
+                    const playerCount = roomData.players ? Object.keys(roomData.players).length : 0;
+                    roomElement.innerHTML = `
+                        <span>${roomData.name}</span>
+                        <span>(${playerCount}/6)</span>
+                    `;
+                    roomElement.addEventListener('click', () => joinRoom(roomId));
+                    roomListContainer.appendChild(roomElement);
+                }
             });
-        }
-        if (roomListContainer.innerHTML === '') {
-            roomListContainer.innerHTML = '<p>ยังไม่มีห้องว่าง, สร้างห้องเลย!</p>';
         }
     });
 }
@@ -119,142 +112,146 @@ function createRoom() {
         status: 'WAITING',
         players: {},
         turn: ''
-    }).then(() => {
-        joinRoom(newRoomRef.key);
     }).catch(error => console.error("สร้างห้องไม่สำเร็จ:", error));
 }
 
 function joinRoom(roomId) {
+    if (!playerName) {
+        alert('เกิดข้อผิดพลาด: ไม่พบชื่อผู้เล่น กรุณากลับไปหน้าแรก');
+        navigateTo('home');
+        return;
+    }
     currentRoomId = roomId;
-    const roomRef = ref(database, `rooms/${roomId}`);
-    const playerRef = ref(database, `rooms/${roomId}/players/${currentPlayerId}`);
+    roomRef = ref(database, `rooms/${currentRoomId}`);
+    playerRef = ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}`);
 
-    set(playerRef, { name: playerName, status: 'WAITING' })
+    const playerData = {
+        name: playerName,
+        isReady: false,
+        secretNumber: '',
+    };
+
+    set(playerRef, playerData)
         .then(() => {
             onDisconnect(playerRef).remove();
             navigateTo('game');
-            resetGameUI();
-            roomUnsubscribe = onValue(roomRef, handleRoomUpdate);
-        });
+            onValue(roomRef, handleRoomUpdate);
+        })
+        .catch(error => console.error("เข้าร่วมห้องไม่สำเร็จ:", error));
 }
 
 function leaveRoom() {
-    if (currentRoomId && currentPlayerId) {
-        const playerRef = ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}`);
-        set(playerRef, null);
+    if (playerRef) {
+        remove(playerRef);
     }
-    if (roomUnsubscribe) {
-        roomUnsubscribe();
-        roomUnsubscribe = null;
+    if (roomRef) {
+        onValue(roomRef, () => {}, { onlyOnce: true }); // Unsubscribe
     }
+    playerRef = null;
+    roomRef = null;
     currentRoomId = null;
     navigateTo('lobby');
-}
-
-function handleReadyUp() {
-    const secretNumber = generateSecretNumber();
-    const playerRef = ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}`);
-    set(playerRef, {
-        name: playerName,
-        status: 'READY',
-        secretNumber: secretNumber
-    });
-}
-
-function generateSecretNumber() {
-    let digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-        const randomIndex = Math.floor(Math.random() * digits.length);
-        result += digits.splice(randomIndex, 1)[0];
-    }
-    return result;
-}
-
-function resetGameUI() {
-    setupSection.classList.remove('hidden');
-    waitingSection.classList.add('hidden');
-    gameplaySection.classList.add('hidden');
-    keypadControls.classList.add('hidden');
-    currentInput = '';
-    gameDisplay.textContent = '';
 }
 
 function handleRoomUpdate(snapshot) {
     const roomData = snapshot.val();
     if (!roomData) {
-        alert("ห้องนี้ถูกปิดแล้ว หรือคุณถูกตัดการเชื่อมต่อ กลับไปที่ล็อบบี้");
+        alert("ห้องถูกปิดแล้ว กลับสู่หน้าล็อบบี้");
         leaveRoom();
         return;
     }
 
     gameRoomName.textContent = `ห้อง: ${roomData.name}`;
-    playerList.innerHTML = '';
     const players = roomData.players || {};
-    Object.values(players).forEach(player => {
-        const li = document.createElement('li');
-        li.className = 'player-item';
-        li.innerHTML = `
-            <span>${player.name}</span>
-            <span class="player-status ${player.status.toLowerCase()}">${player.status}</span>
-        `;
-        playerList.appendChild(li);
-    });
+    const playerCount = Object.keys(players).length;
+
+    if (playerCount === 0) {
+        remove(ref(database, `rooms/${currentRoomId}`));
+        return;
+    }
 
     const me = players[currentPlayerId];
-    if (!me) return;
-
-    if (me.status === 'WAITING') {
-        setupSection.classList.remove('hidden');
-        waitingSection.classList.add('hidden');
-        gameplaySection.classList.add('hidden');
-        keypadControls.classList.add('hidden');
-    } else if (me.status === 'READY') {
-        setupSection.classList.add('hidden');
-        waitingSection.classList.remove('hidden');
-        gameplaySection.classList.add('hidden');
-        keypadControls.classList.add('hidden');
+    if (!me) {
+        return;
     }
 
-    const playerCount = Object.keys(players).length;
-    const readyCount = Object.values(players).filter(p => p.status === 'READY').length;
+    playerList.innerHTML = '';
+    Object.values(players).forEach(p => {
+        const playerElement = document.createElement('div');
+        playerElement.className = 'player-list-item';
+        playerElement.innerHTML = `
+            <span>ผู้เล่น ${p.name}</span>
+            <span class="status ${p.isReady ? 'ready' : 'waiting'}">
+                ${p.isReady ? 'READY' : 'WAITING'}
+            </span>
+        `;
+        playerList.appendChild(playerElement);
+    });
 
-    if (roomData.status === 'WAITING' && playerCount >= 2 && playerCount === readyCount) {
-        const firstPlayerId = Object.keys(players)[0];
-        set(ref(database, `rooms/${currentRoomId}/status`), 'PLAYING');
-        set(ref(database, `rooms/${currentRoomId}/turn`), firstPlayerId);
-    }
+    const allReady = Object.values(players).every(p => p.isReady);
 
-    if (roomData.status === 'PLAYING') {
-        if (keypadContainer.innerHTML === '') {
-            createKeypad();
+    if (roomData.status === 'WAITING') {
+        setupSection.style.display = 'block';
+        waitingSection.style.display = 'none';
+        gameplaySection.style.display = 'none';
+        if (allReady && playerCount >= 2) {
+            set(ref(database, `rooms/${currentRoomId}/status`), 'PLAYING');
         }
-        setupSection.classList.add('hidden');
-        waitingSection.classList.add('hidden');
-        gameplaySection.classList.remove('hidden');
-        keypadControls.classList.remove('hidden');
-        
-        const turnPlayer = players[roomData.turn];
-        turnIndicator.textContent = `ตาของ: ${turnPlayer.name}`;
-        buttons.guess.disabled = (roomData.turn !== currentPlayerId);
+    } else if (roomData.status === 'PLAYING') {
+        setupSection.style.display = 'none';
+        waitingSection.style.display = 'none';
+        gameplaySection.style.display = 'block';
     }
 }
 
-buttons.goToLobby.addEventListener('click', () => {
-    const name = playerNameInput.value.trim();
-    if (name === '') {
-        alert('กรุณาตั้งชื่อของคุณก่อน!');
-        return;
+function handleReadyUp() {
+    const secretNumber = generateSecretNumber();
+    set(ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}/secretNumber`), secretNumber);
+    set(ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}/isReady`), true);
+    
+    setupSection.style.display = 'none';
+    waitingSection.style.display = 'block';
+}
+
+function generateSecretNumber() {
+    let number = '';
+    const digits = '0123456789'.split('');
+    for (let i = 0; i < 4; i++) {
+        const randomIndex = Math.floor(Math.random() * digits.length);
+        number += digits.splice(randomIndex, 1)[0];
     }
-    playerName = name;
-    navigateTo('lobby');
-    loadRooms();
+    return number;
+}
+
+function handleKeypadClick(e) {
+    if (!e.target.matches('[data-key]')) return;
+    const key = e.target.dataset.key;
+    if (currentInput.length < 4) {
+        currentInput += key;
+        gameDisplay.textContent = currentInput;
+    }
+}
+
+function handleDelete() {
+    currentInput = currentInput.slice(0, -1);
+    gameDisplay.textContent = currentInput;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const savedPlayerName = sessionStorage.getItem('playerName');
+    if (savedPlayerName) {
+        inputs.playerName.value = savedPlayerName;
+    }
+    navigateTo('home');
 });
 
+buttons.goToLobby.addEventListener('click', goToLobby);
 buttons.createRoom.addEventListener('click', createRoom);
 buttons.leaveRoom.addEventListener('click', leaveRoom);
 buttons.delete.addEventListener('click', handleDelete);
 buttons.readyUp.addEventListener('click', handleReadyUp);
+keypadContainer.addEventListener('click', handleKeypadClick);
+
 buttons.guess.addEventListener('click', () => {
     if (currentInput.length !== 4) {
         alert('กรุณากรอกเลขให้ครบ 4 หลัก');
@@ -264,5 +261,3 @@ buttons.guess.addEventListener('click', () => {
     currentInput = '';
     gameDisplay.textContent = '';
 });
-
-navigateTo('home');
