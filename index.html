@@ -1,255 +1,81 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, set, onValue, push, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมทายเลข (2-6 คน)</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
 
-const firebaseConfig = {
-    apiKey: "AIzaSyANK5rvwlgWc11EvXQRXpsSOO-tGV29pKA",
-    authDomain: "taijai2.firebaseapp.com",
-    databaseURL: "https://taijai2-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "taijai2",
-    storageBucket: "taijai2.appspot.com",
-    messagingSenderId: "111291976868",
-    appId: "1:111291976868:web:fee4606918ba2bbf93ea31"
-};
+    <div class="app-container">
 
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
+        <div id="page-home" class="page active">
+            <div class="content-box">
+                <h1>เกมทายเลข</h1>
+                <p>ทายตัวเลข 4 หลักของเพื่อนให้ถูก!</p>
+                <div class="input-group">
+                    <label for="player-name-input">กรุณาตั้งชื่อของคุณ:</label>
+                    <input type="text" id="player-name-input" class="input-field" placeholder="ชื่อผู้เล่น" maxlength="15">
+                </div>
+                <button id="btn-go-to-lobby" class="button primary">เข้าสู่ล็อบบี้</button>
+            </div>
+        </div>
 
-const pages = {
-    home: document.getElementById('page-home'),
-    lobby: document.getElementById('page-lobby'),
-    game: document.getElementById('page-game'),
-};
+        <div id="page-lobby" class="page">
+            <div class="content-box">
+                <h2>เลือกห้อง</h2>
+                <div id="room-list" class="room-list">
+                    <p>กำลังโหลดห้อง...</p>
+                </div>
+                <button id="btn-create-room" class="button">สร้างห้องใหม่</button>
+            </div>
+        </div>
 
-const buttons = {
-    goToLobby: document.getElementById('btn-go-to-lobby'),
-    createRoom: document.getElementById('btn-create-room'),
-    leaveRoom: document.getElementById('btn-leave-room'),
-    delete: document.getElementById('btn-delete'),
-    guess: document.getElementById('btn-guess'),
-    readyUp: document.getElementById('btn-ready-up'),
-};
+        <div id="page-game" class="page">
+            <div class="content-box">
+                <h2 id="game-room-name">ห้อง: ...</h2>
 
-const roomListContainer = document.getElementById('room-list');
-const keypadContainer = document.querySelector('.keypad');
-const gameRoomName = document.getElementById('game-room-name');
-const playerList = document.getElementById('player-list');
-const setupSection = document.getElementById('setup-section');
-const waitingSection = document.getElementById('waiting-section');
-const gameplaySection = document.getElementById('gameplay-section');
-const keypadControls = document.getElementById('keypad-controls');
-const gameDisplay = document.getElementById('game-display');
-const turnIndicator = document.getElementById('turn-indicator');
+                <div id="setup-section">
+                    <h3>พร้อมที่จะเล่นหรือยัง?</h3>
+                    <p>กดปุ่มด้านล่างเพื่อสุ่มเลขลับ 4 หลัก<br>และเตรียมพร้อมเข้าสู่เกม</p>
+                    <button id="btn-ready-up" class="button primary">สุ่มเลขลับและเริ่มเลย!</button>
+                </div>
 
-let currentInput = '';
-let currentPlayerId = `player_${Math.random().toString(36).substr(2, 9)}`;
-let currentRoomId = null;
-let roomUnsubscribe = null;
+                <div id="waiting-section" class="hidden">
+                    <h3>ยอดเยี่ยม!</h3>
+                    <p>กำลังรอผู้เล่นคนอื่นตั้งค่า...</p>
+                    <div class="loader"></div>
+                </div>
 
-function navigateTo(pageName) {
-    Object.values(pages).forEach(page => page.classList.remove('active'));
-    if (pages[pageName]) {
-        pages[pageName].classList.add('active');
-    }
-}
+                <div id="gameplay-section" class="hidden">
+                    <h3 id="turn-indicator">ตาของ: ...</h3>
+                    <div id="game-display" class="display-box"></div>
+                </div>
 
-function createKeypad() {
-    keypadContainer.innerHTML = '';
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', ''];
-    keys.forEach(keyText => {
-        if (keyText === '') {
-            keypadContainer.appendChild(document.createElement('div'));
-        } else {
-            const keyElement = document.createElement('button');
-            keyElement.className = 'key';
-            keyElement.textContent = keyText;
-            keyElement.addEventListener('click', () => handleKeyPress(keyText));
-            keypadContainer.appendChild(keyElement);
-        }
-    });
-}
+                <div class="player-status-box">
+                    <h4>ผู้เล่นในห้อง</h4>
+                    <ul id="player-list">
+                    </ul>
+                </div>
 
-function handleKeyPress(key) {
-    if (currentInput.length < 4) {
-        currentInput += key;
-        gameDisplay.textContent = currentInput;
-    }
-}
+                <div id="keypad-controls" class="hidden">
+                     <div class="keypad"></div>
+                     <div class="controls">
+                        <button id="btn-delete" class="button secondary">ลบ</button>
+                        <button id="btn-guess" class="button primary guess">ทาย</button>
+                    </div>
+                </div>
 
-function handleDelete() {
-    currentInput = currentInput.slice(0, -1);
-    gameDisplay.textContent = currentInput;
-}
+                <button id="btn-leave-room" class="button danger">ออกจากห้อง</button>
+            </div>
+        </div>
 
-function loadRooms() {
-    const roomsRef = ref(database, 'rooms');
-    onValue(roomsRef, (snapshot) => {
-        roomListContainer.innerHTML = '';
-        const rooms = snapshot.val();
-        if (rooms) {
-            Object.keys(rooms).forEach(roomId => {
-                const roomData = rooms[roomId];
-                const playerCount = roomData.players ? Object.keys(roomData.players).length : 0;
-                if (playerCount >= 6 || roomData.status === 'PLAYING') return;
+    </div>
 
-                const roomElement = document.createElement('div');
-                roomElement.className = 'room-item';
-                roomElement.textContent = `${roomData.name} (${playerCount}/6)`;
-                roomElement.addEventListener('click', () => joinRoom(roomId));
-                roomListContainer.appendChild(roomElement);
-            });
-        }
-        if (roomListContainer.innerHTML === '') {
-            roomListContainer.innerHTML = '<p>ยังไม่มีห้องว่าง, สร้างห้องเลย!</p>';
-        }
-    });
-}
-
-function createRoom() {
-    const roomName = prompt("กรุณาตั้งชื่อห้อง:", "ห้องทายเลข");
-    if (!roomName) return;
-
-    const roomsRef = ref(database, 'rooms');
-    const newRoomRef = push(roomsRef);
-
-    set(newRoomRef, {
-        name: roomName,
-        createdAt: serverTimestamp(),
-        status: 'WAITING',
-        players: {},
-        turn: ''
-    }).then(() => {
-        joinRoom(newRoomRef.key);
-    }).catch(error => console.error("สร้างห้องไม่สำเร็จ:", error));
-}
-
-function joinRoom(roomId) {
-    currentRoomId = roomId;
-    const roomRef = ref(database, `rooms/${roomId}`);
-    const playerRef = ref(database, `rooms/${roomId}/players/${currentPlayerId}`);
-
-    set(playerRef, { name: `ผู้เล่น ${currentPlayerId.substring(0, 3)}`, status: 'WAITING' })
-        .then(() => {
-            onDisconnect(playerRef).remove();
-            navigateTo('game');
-            resetGameUI();
-            roomUnsubscribe = onValue(roomRef, handleRoomUpdate);
-        });
-}
-
-function leaveRoom() {
-    if (currentRoomId && currentPlayerId) {
-        const playerRef = ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}`);
-        set(playerRef, null);
-    }
-    if (roomUnsubscribe) {
-        roomUnsubscribe();
-        roomUnsubscribe = null;
-    }
-    currentRoomId = null;
-    navigateTo('lobby');
-}
-
-function handleReadyUp() {
-    const secretNumber = generateSecretNumber();
-    const playerRef = ref(database, `rooms/${currentRoomId}/players/${currentPlayerId}`);
-    set(playerRef, {
-        name: `ผู้เล่น ${currentPlayerId.substring(0, 3)}`,
-        status: 'READY',
-        secretNumber: secretNumber
-    });
-}
-
-function generateSecretNumber() {
-    let digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-        const randomIndex = Math.floor(Math.random() * digits.length);
-        result += digits.splice(randomIndex, 1)[0];
-    }
-    return result;
-}
-
-function resetGameUI() {
-    setupSection.classList.remove('hidden');
-    waitingSection.classList.add('hidden');
-    gameplaySection.classList.add('hidden');
-    keypadControls.classList.add('hidden');
-    currentInput = '';
-    gameDisplay.textContent = '';
-}
-
-function handleRoomUpdate(snapshot) {
-    const roomData = snapshot.val();
-    if (!roomData) {
-        alert("ห้องนี้ถูกปิดแล้ว กลับไปที่ล็อบบี้");
-        leaveRoom();
-        return;
-    }
-
-    gameRoomName.textContent = `ห้อง: ${roomData.name}`;
-    playerList.innerHTML = '';
-    const players = roomData.players || {};
-    Object.values(players).forEach(player => {
-        const li = document.createElement('li');
-        li.className = 'player-item';
-        li.innerHTML = `
-            <span>${player.name}</span>
-            <span class="player-status ${player.status.toLowerCase()}">${player.status}</span>
-        `;
-        playerList.appendChild(li);
-    });
-
-    const me = players[currentPlayerId];
-    if (!me) return;
-
-    if (me.status === 'WAITING') {
-        setupSection.classList.remove('hidden');
-        waitingSection.classList.add('hidden');
-        gameplaySection.classList.add('hidden');
-        keypadControls.classList.add('hidden');
-    } else if (me.status === 'READY') {
-        setupSection.classList.add('hidden');
-        waitingSection.classList.remove('hidden');
-        gameplaySection.classList.add('hidden');
-        keypadControls.classList.add('hidden');
-    }
-
-    const playerCount = Object.keys(players).length;
-    const readyCount = Object.values(players).filter(p => p.status === 'READY').length;
-
-    if (roomData.status === 'WAITING' && playerCount >= 2 && playerCount === readyCount) {
-        const firstPlayerId = Object.keys(players)[0];
-        set(ref(database, `rooms/${currentRoomId}/status`), 'PLAYING');
-        set(ref(database, `rooms/${currentRoomId}/turn`), firstPlayerId);
-    }
-
-    if (roomData.status === 'PLAYING') {
-        if (keypadContainer.innerHTML === '') {
-            createKeypad();
-        }
-        setupSection.classList.add('hidden');
-        waitingSection.classList.add('hidden');
-        gameplaySection.classList.remove('hidden');
-        keypadControls.classList.remove('hidden');
-        
-        const turnPlayer = players[roomData.turn];
-        turnIndicator.textContent = `ตาของ: ${turnPlayer.name}`;
-        buttons.guess.disabled = (roomData.turn !== currentPlayerId);
-    }
-}
-
-buttons.goToLobby.addEventListener('click', () => {
-    navigateTo('lobby');
-    loadRooms();
-});
-buttons.createRoom.addEventListener('click', createRoom);
-buttons.leaveRoom.addEventListener('click', leaveRoom);
-buttons.delete.addEventListener('click', handleDelete);
-buttons.readyUp.addEventListener('click', handleReadyUp);
-buttons.guess.addEventListener('click', () => {
-    alert(`ทายเลข: ${currentInput}`);
-    currentInput = '';
-    gameDisplay.textContent = '';
-});
-
-console.log("Application Initialized");
+    <script type="module" src="script.js"></script>
+</body>
+</html>
