@@ -1,26 +1,9 @@
 /* --- การตั้งค่าพื้นฐานและฟอนต์ --- */
-:root {
-    --bg-color: #F0FFF4; /* สีพื้นหลัง (Honeydew) */
-    --primary-color: #98D8C8; /* สีหลัก (Mint Green) */
-    --secondary-color: #FDFD96; /* สีไฮไลท์ (Pastel Yellow) */
-    --accent-color: #FF6B6B; /* สีสำหรับปุ่มอันตราย (Pastel Red) */
-    --text-color: #3A4F41; /* สีตัวอักษร (Dark Green-Gray) */
-    --white-color: #FFFFFF;
-    --gray-color: #D3D3D3;
-    --correct-color: #4CAF50; /* สีเขียวสำหรับ 'ถูกเป๊ะ' */
-    --misplaced-color: #FFC107; /* สีเหลืองสำหรับ 'เพี้ยน' */
-}
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
 body {
-    font-family: 'IBM Plex Sans Thai', sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    font-family: 'Mitr', sans-serif;
+    background-color: #f0f2f5;
+    color: #333;
+    margin: 0;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -28,350 +11,211 @@ body {
     overflow: hidden;
 }
 
-#game-container {
+/* --- โครงสร้างหลัก --- */
+.app-container {
     width: 100%;
     height: 100%;
-    max-width: 480px; /* ขนาดหน้าจอมือถือส่วนใหญ่ */
-    position: relative;
-    background-color: var(--white-color);
-    box-shadow: 0 0 20px rgba(0,0,0,0.1);
-    overflow: hidden;
 }
 
-/* --- โครงสร้างหน้าจอ (Screen) --- */
-.screen {
-    position: absolute;
-    top: 0;
-    left: 0;
+.page {
+    display: none; /* **สำคัญ: ซ่อนทุกหน้าเป็นค่าเริ่มต้น** */
     width: 100%;
     height: 100%;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
     padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    box-sizing: border-box;
+}
+
+.page.active {
+    display: flex; /* **สำคัญ: แสดงเฉพาะหน้าที่มีคลาส .active** */
+}
+
+.content-box {
+    background: white;
+    padding: 30px 40px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     text-align: center;
-    transition: transform 0.5s ease-in-out, opacity 0.5s;
-    transform: translateX(100%);
-    opacity: 0;
-    visibility: hidden;
-}
-
-.screen.active {
-    transform: translateX(0);
-    opacity: 1;
-    visibility: visible;
-}
-
-/* --- สไตล์ปุ่มและ Input --- */
-button, input[type="text"] {
-    font-family: 'IBM Plex Sans Thai', sans-serif;
-    font-size: 16px;
-    padding: 12px 20px;
-    border-radius: 8px;
-    border: 1px solid var(--primary-color);
-    margin: 8px 0;
-    width: 80%;
-    max-width: 300px;
-}
-
-button {
-    background-color: var(--primary-color);
-    color: var(--text-color);
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-button:hover {
-    background-color: #7fbfb0;
-}
-
-input[type="text"] {
-    background-color: var(--white-color);
-}
-
-/* --- หน้าจอ Splash และ Lobby --- */
-#splash-screen h1 {
-    font-size: 48px;
-    color: var(--primary-color);
-}
-.tap-to-start {
-    margin-top: 30px;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-
-/* --- หน้าจอเล่นเกม (Game Screen) --- */
-#game-screen {
-    justify-content: space-between;
-}
-
-.top-zone {
     width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 10px;
+    max-width: 400px;
 }
 
-#turn-info {
-    font-size: 18px;
-    font-weight: bold;
-    background-color: var(--secondary-color);
-    padding: 5px 15px;
-    border-radius: 15px;
+/* --- องค์ประกอบทั่วไป (ปุ่ม, หัวข้อ) --- */
+h1, h2, h3 {
+    color: #4a4e69;
+    margin-top: 0;
 }
 
-#timer {
-    position: relative;
-    width: 50px;
-    height: 50px;
-}
-
-.timer-svg {
-    transform: rotate(-90deg);
-}
-
-.timer-circle-bg {
-    fill: none;
-    stroke: var(--gray-color);
-    stroke-width: 4;
-}
-
-.timer-circle {
-    fill: none;
-    stroke: var(--primary-color);
-    stroke-width: 4;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 1s linear;
-}
-
-#timer-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 20px;
-    font-weight: bold;
-}
-
-#players-display-area {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    width: 100%;
-    padding: 10px;
-}
-
-.player-icon {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px;
-    border-radius: 10px;
-    border: 2px solid transparent;
-    transition: all 0.3s;
-}
-
-.player-icon.dead {
-    opacity: 0.4;
-}
-
-.player-icon.dead .player-avatar::after {
-    content: '👻';
-    position: absolute;
-    font-size: 24px;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.player-icon.target {
-    border-color: var(--accent-color);
-    transform: scale(1.1);
-}
-
-.player-icon.guesser {
-    border-color: var(--secondary-color);
-}
-
-.player-avatar {
-    width: 50px;
-    height: 50px;
-    background-color: var(--primary-color);
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--white-color);
-    position: relative;
-}
-
-.player-name {
-    margin-top: 5px;
-    font-size: 14px;
-    font-weight: bold;
-}
-
-.player-lives {
-    font-size: 16px;
-}
-
-.bottom-zone {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-bottom: 10px;
-}
-
-#guess-input-display {
-    display: flex;
+p {
+    color: #666;
+    margin-top: 0;
     margin-bottom: 15px;
 }
 
-#guess-input-display span {
-    width: 40px;
-    height: 50px;
-    border: 2px solid var(--primary-color);
+.button {
+    font-family: 'Mitr', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    padding: 12px 24px;
     border-radius: 8px;
-    margin: 0 5px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 24px;
-    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    margin-top: 15px;
+    box-sizing: border-box;
 }
 
-#numpad {
+.button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.button.primary { background-color: #5a67d8; color: white; }
+.button.primary:hover:not(:disabled) { background-color: #434190; }
+
+.button.secondary { background-color: #e2e8f0; color: #2d3748; }
+.button.secondary:hover:not(:disabled) { background-color: #cbd5e0; }
+
+.button.danger { background-color: #e53e3e; color: white; }
+.button.danger:hover:not(:disabled) { background-color: #c53030; }
+
+.button.guess { background-color: #38a169; }
+.button.guess:hover:not(:disabled) { background-color: #2f855a; }
+
+
+/* --- สไตล์เฉพาะส่วน --- */
+/* Lobby */
+.room-list {
+    margin: 20px 0;
+    min-height: 150px;
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.room-item {
+    background-color: #f7fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    text-align: left;
+}
+.room-item:hover { background-color: #edf2f7; }
+
+/* Game */
+.display-box {
+    background-color: #edf2f7;
+    border: 2px solid #cbd5e0;
+    border-radius: 8px;
+    height: 60px;
+    margin: 15px 0;
+    font-size: 2.5em;
+    letter-spacing: 15px;
+    text-align: center;
+    line-height: 60px;
+    padding-left: 15px;
+    box-sizing: border-box;
+}
+
+.keypad {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
-    width: 80%;
-    max-width: 300px;
+    margin: 20px 0;
 }
 
-#numpad button {
-    width: 100%;
-    height: 50px;
-    font-size: 20px;
-    padding: 0;
-    background-color: var(--bg-color);
-}
-
-.action-buttons {
-    display: flex;
-    width: 80%;
-    max-width: 300px;
-    gap: 10px;
-    margin-top: 15px;
-}
-
-.action-btn {
-    flex: 1;
-}
-
-.action-btn.eliminate {
-    background-color: var(--accent-color);
-    color: var(--white-color);
-}
-
-/* --- Popups (Chat & History) --- */
-.popup {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    width: 60px;
-    height: 60px;
-    background-color: var(--primary-color);
-    border-radius: 30px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+.key {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1.5em;
+    padding: 18px;
     cursor: pointer;
-    transition: all 0.3s ease-in-out;
-    overflow: hidden;
 }
+.key:hover { background-color: #f0f0f0; }
 
-.popup.open {
-    width: 95%;
-    height: 70%;
-    left: 2.5%;
-    bottom: 10px;
-    border-radius: 15px;
-    cursor: default;
-}
-
-.popup-header {
-    height: 60px;
+.controls {
     display: flex;
-    justify-content: center;
-    align-items: center;
-    color: var(--text-color);
-    font-weight: bold;
-    font-size: 18px;
+    gap: 10px;
 }
 
-.popup.open .popup-header {
-    justify-content: flex-start;
-    padding-left: 20px;
-}
+/* --- สไตล์เพิ่มเติมสำหรับหน้าเกมหลายคน --- */
 
-.popup-content {
-    padding: 10px;
-    height: calc(100% - 60px);
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s;
-}
-
-.popup.open .popup-content {
-    opacity: 1;
-    visibility: visible;
-}
-
-#history-popup {
-    left: auto;
-    right: 10px;
-}
-
-/* --- Modals --- */
-.modal {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s;
-}
-
-.modal.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
-    background-color: var(--white-color);
-    padding: 30px;
-    border-radius: 15px;
-    width: 90%;
-    max-width: 400px;
-    text-align: center;
-}
-
+/* ซ่อนองค์ประกอบด้วยคลาส .hidden */
 .hidden {
     display: none !important;
+}
+
+/* กล่องแสดงรายชื่อผู้เล่น */
+.player-status-box {
+    text-align: left;
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #f7fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.player-status-box h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #4a4e69;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 8px;
+}
+
+#player-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 500;
+}
+
+.player-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.player-status.waiting {
+    background-color: #feebc8; /* เหลือง */
+    color: #9c4221;
+}
+
+.player-status.ready {
+    background-color: #c6f6d5; /* เขียว */
+    color: #22543d;
+}
+
+/* Animation สำหรับรอ */
+.loader {
+    border: 4px solid #f3f3f3;
+    border-radius: 50%;
+    border-top: 4px solid #5a67d8;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
